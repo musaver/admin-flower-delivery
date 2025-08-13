@@ -876,7 +876,7 @@ export default function EditProduct() {
             </div>
 
             {/* Cannabis-specific fields */}
-            <div className="mt-6 p-4 border rounded-lg bg-green-50">
+            <div className="mt-6 p-4 border rounded-lg bg-green-50 hidden">
               <h4 className="text-lg font-semibold mb-4 text-green-800">🌿 Cannabis Properties</h4>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
@@ -1493,7 +1493,7 @@ export default function EditProduct() {
         <div className="mt-6">
           <h3 className="text-lg font-semibold mb-4">Settings</h3>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-            <label className="flex items-center">
+            <label className=" items-center hidden">
               <input
                 type="checkbox"
                 name="isFeatured"
@@ -1515,7 +1515,7 @@ export default function EditProduct() {
               Active
             </label>
 
-            <label className="flex items-center">
+            <label className=" items-center hidden">
               <input
                 type="checkbox"
                 name="isDigital"
@@ -1526,7 +1526,7 @@ export default function EditProduct() {
               Digital Product
             </label>
 
-            <label className="flex items-center">
+            <label className="items-center hidden">
               <input
                 type="checkbox"
                 name="requiresShipping"
@@ -1537,7 +1537,7 @@ export default function EditProduct() {
               Requires Shipping
             </label>
 
-            <label className="flex items-center">
+            <label className=" items-center hidden">
               <input
                 type="checkbox"
                 name="taxable"
@@ -1551,7 +1551,7 @@ export default function EditProduct() {
         </div>
 
         {/* Product Tags */}
-        <div className="mt-6">
+        <div className="mt-6 hidden">
           <h3 className="text-lg font-semibold mb-4">🏷️ Product Tags</h3>
           <div className="bg-gray-50 p-4 rounded-lg">
             <TagSelector
@@ -1563,7 +1563,7 @@ export default function EditProduct() {
         </div>
 
         {/* SEO */}
-        <div className="mt-6">
+        <div className="mt-6 hidden">
           <h3 className="text-lg font-semibold mb-4">SEO</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>

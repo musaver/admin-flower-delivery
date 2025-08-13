@@ -113,120 +113,10 @@ export default function AddDriver() {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Personal Information */}
-        <div className="bg-white p-6 rounded-lg border">
-          <div className="flex items-center space-x-2 mb-4">
-            <User className="w-5 h-5 text-blue-600" />
-            <h2 className="text-lg font-semibold text-gray-900">Personal Information</h2>
-          </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Full Name *
-              </label>
-              <input
-                type="text"
-                name="name"
-                value={formData.name}
-                onChange={handleChange}
-                required
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="Enter full name"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Email Address *
-              </label>
-              <input
-                type="email"
-                name="email"
-                value={formData.email}
-                onChange={handleChange}
-                required
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="Enter email address"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Phone Number
-              </label>
-              <input
-                type="tel"
-                name="phone"
-                value={formData.phone}
-                onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="Enter phone number"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Password *
-              </label>
-              <input
-                type="password"
-                name="password"
-                value={formData.password}
-                onChange={handleChange}
-                required
-                minLength={6}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="Enter password"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                City
-              </label>
-              <input
-                type="text"
-                name="city"
-                value={formData.city}
-                onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="Enter city"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                State/Emirate
-              </label>
-              <input
-                type="text"
-                name="state"
-                value={formData.state}
-                onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="Enter state/emirate"
-              />
-            </div>
-
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Address
-              </label>
-              <textarea
-                name="address"
-                value={formData.address}
-                onChange={handleChange}
-                rows={2}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="Enter full address"
-              />
-            </div>
-          </div>
-        </div>
+        
 
         {/* License & Credentials */}
-        <div className="bg-white p-6 rounded-lg border">
+        <div className="bg-white p-6 rounded-lg border hidden">
           <div className="flex items-center space-x-2 mb-4">
             <Shield className="w-5 h-5 text-green-600" />
             <h2 className="text-lg font-semibold text-gray-900">License & Credentials</h2>
@@ -268,7 +158,7 @@ export default function AddDriver() {
         </div>
 
         {/* Vehicle Information */}
-        <div className="bg-white p-6 rounded-lg border">
+        <div className="bg-white p-6 rounded-lg border hidden">
           <div className="flex items-center space-x-2 mb-4">
             <Car className="w-5 h-5 text-purple-600" />
             <h2 className="text-lg font-semibold text-gray-900">Vehicle Information</h2>
@@ -392,7 +282,7 @@ export default function AddDriver() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
+              <div className="hidden">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Latitude
                 </label>
@@ -408,7 +298,7 @@ export default function AddDriver() {
                 />
               </div>
 
-              <div>
+              <div className="hidden">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Longitude
                 </label>
@@ -450,8 +340,120 @@ export default function AddDriver() {
           </div>
         </div>
 
-        {/* Emergency Contact */}
+
+        {/* Personal Information */}
         <div className="bg-white p-6 rounded-lg border">
+          <div className="flex items-center space-x-2 mb-4">
+            <User className="w-5 h-5 text-blue-600" />
+            <h2 className="text-lg font-semibold text-gray-900">Personal Information</h2>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Full Name *
+              </label>
+              <input
+                type="text"
+                name="name"
+                value={formData.name}
+                onChange={handleChange}
+                required
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="Enter full name"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Email Address *
+              </label>
+              <input
+                type="email"
+                name="email"
+                value={formData.email}
+                onChange={handleChange}
+                required
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="Enter email address"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Phone Number
+              </label>
+              <input
+                type="tel"
+                name="phone"
+                value={formData.phone}
+                onChange={handleChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="Enter phone number"
+              />
+            </div>
+
+            <div className="hidden">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Password *
+              </label>
+              <input
+                type="password"
+                name="password"
+                value={formData.password}
+                onChange={handleChange}
+                minLength={6}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="Enter password"
+              />
+            </div>
+
+            <div className="hidden">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                City
+              </label>
+              <input
+                type="text"
+                name="city"
+                value={formData.city}
+                onChange={handleChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="Enter city"
+              />
+            </div>
+
+            <div className="hidden">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                State/Emirate
+              </label>
+              <input
+                type="text"
+                name="state"
+                value={formData.state}
+                onChange={handleChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="Enter state/emirate"
+              />
+            </div>
+
+            <div className="md:col-span-2 hidden">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Address
+              </label>
+              <textarea
+                name="address"
+                value={formData.address}
+                onChange={handleChange}
+                rows={2}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="Enter full address"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Emergency Contact */}
+        <div className="bg-white p-6 rounded-lg border hidden">
           <div className="flex items-center space-x-2 mb-4">
             <Phone className="w-5 h-5 text-orange-600" />
             <h2 className="text-lg font-semibold text-gray-900">Emergency Contact</h2>

@@ -78,7 +78,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
     { name: 'Dashboard', href: '/', icon: LayoutDashboardIcon, category: 'main' },
     { name: 'Customers', href: '/users', icon: UsersIcon, category: 'main' },
     { name: 'Products', href: '/products', icon: PackageIcon, category: 'main' },
-    { name: 'Tags', href: '/tags', icon: TagIcon, category: 'main' },
+    /*{ name: 'Tags', href: '/tags', icon: TagIcon, category: 'main' },*/
     
     { name: 'Inventory', href: '/inventory', icon: BarChart3Icon, category: 'operations' },
     { name: 'Orders', href: '/orders', icon: ShoppingCartIcon, category: 'operations', badge: pendingOrdersCount > 0 ? pendingOrdersCount : null },

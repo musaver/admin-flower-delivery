@@ -247,115 +247,10 @@ export default function EditDriver() {
       )}
 
       <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Personal Information */}
-        <div className="bg-white p-6 rounded-lg border">
-          <div className="flex items-center space-x-2 mb-4">
-            <User className="w-5 h-5 text-blue-600" />
-            <h2 className="text-lg font-semibold text-gray-900">Personal Information</h2>
-          </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Full Name
-              </label>
-              <input
-                type="text"
-                name="name"
-                value={formData.name}
-                onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="Enter full name"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Email Address
-              </label>
-              <input
-                type="email"
-                value={driver.user.email}
-                disabled
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-500"
-                placeholder="Email cannot be changed"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Phone Number
-              </label>
-              <input
-                type="tel"
-                name="phone"
-                value={formData.phone}
-                onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="Enter phone number"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                City
-              </label>
-              <input
-                type="text"
-                name="city"
-                value={formData.city}
-                onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="Enter city"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                State/Emirate
-              </label>
-              <input
-                type="text"
-                name="state"
-                value={formData.state}
-                onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="Enter state/emirate"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Postal Code
-              </label>
-              <input
-                type="text"
-                name="postalCode"
-                value={formData.postalCode}
-                onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="Enter postal code"
-              />
-            </div>
-
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Address
-              </label>
-              <textarea
-                name="address"
-                value={formData.address}
-                onChange={handleChange}
-                rows={2}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="Enter full address"
-              />
-            </div>
-          </div>
-        </div>
+        
 
         {/* License & Status */}
-        <div className="bg-white p-6 rounded-lg border">
+        <div className="bg-white p-6 rounded-lg border hidden">
           <div className="flex items-center space-x-2 mb-4">
             <Shield className="w-5 h-5 text-green-600" />
             <h2 className="text-lg font-semibold text-gray-900">License & Status</h2>
@@ -415,7 +310,7 @@ export default function EditDriver() {
         </div>
 
         {/* Vehicle Information */}
-        <div className="bg-white p-6 rounded-lg border">
+        <div className="bg-white p-6 rounded-lg border hidden">
           <div className="flex items-center space-x-2 mb-4">
             <Car className="w-5 h-5 text-purple-600" />
             <h2 className="text-lg font-semibold text-gray-900">Vehicle Information</h2>
@@ -539,7 +434,7 @@ export default function EditDriver() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div>
+              <div className="hidden">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Base Latitude
                 </label>
@@ -555,7 +450,7 @@ export default function EditDriver() {
                 />
               </div>
 
-              <div>
+              <div className="hidden">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Base Longitude
                 </label>
@@ -571,7 +466,7 @@ export default function EditDriver() {
                 />
               </div>
 
-              <div>
+              <div className="hidden">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Current Latitude
                 </label>
@@ -586,7 +481,7 @@ export default function EditDriver() {
                 />
               </div>
 
-              <div>
+              <div className="hidden">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Current Longitude
                 </label>
@@ -629,8 +524,115 @@ export default function EditDriver() {
           </div>
         </div>
 
-        {/* Emergency Contact */}
+        {/* Personal Information */}
         <div className="bg-white p-6 rounded-lg border">
+          <div className="flex items-center space-x-2 mb-4">
+            <User className="w-5 h-5 text-blue-600" />
+            <h2 className="text-lg font-semibold text-gray-900">Personal Information</h2>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Full Name
+              </label>
+              <input
+                type="text"
+                name="name"
+                value={formData.name}
+                onChange={handleChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="Enter full name"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Email Address
+              </label>
+              <input
+                type="email"
+                value={driver.user.email}
+                disabled
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-500"
+                placeholder="Email cannot be changed"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Phone Number
+              </label>
+              <input
+                type="tel"
+                name="phone"
+                value={formData.phone}
+                onChange={handleChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="Enter phone number"
+              />
+            </div>
+
+            <div className="hidden">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                City
+              </label>
+              <input
+                type="text"
+                name="city"
+                value={formData.city}
+                onChange={handleChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="Enter city"
+              />
+            </div>
+
+            <div className="hidden">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                State/Emirate
+              </label>
+              <input
+                type="text"
+                name="state"
+                value={formData.state}
+                onChange={handleChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="Enter state/emirate"
+              />
+            </div>
+
+            <div className="hidden">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Postal Code
+              </label>
+              <input
+                type="text"
+                name="postalCode"
+                value={formData.postalCode}
+                onChange={handleChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="Enter postal code"
+              />
+            </div>
+
+            <div className="md:col-span-2 hidden">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Address
+              </label>
+              <textarea
+                name="address"
+                value={formData.address}
+                onChange={handleChange}
+                rows={2}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="Enter full address"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Emergency Contact */}
+        <div className="bg-white p-6 rounded-lg border hidden">
           <div className="flex items-center space-x-2 mb-4">
             <Phone className="w-5 h-5 text-orange-600" />
             <h2 className="text-lg font-semibold text-gray-900">Emergency Contact</h2>
