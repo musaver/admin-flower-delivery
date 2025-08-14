@@ -175,7 +175,7 @@ export async function POST(req: NextRequest) {
     } = body;
 
     // Validate required fields
-    if (!name || !email || !password) {
+    if (!name || !email) {
       return NextResponse.json(
         { error: 'Missing required fields' },
         { status: 400 }
