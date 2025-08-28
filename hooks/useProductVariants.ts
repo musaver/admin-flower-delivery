@@ -13,6 +13,7 @@ export interface VariantData {
   inventoryQuantity: number;
   attributes: { [key: string]: string };
   isActive: boolean;
+  outOfStock: boolean;
 }
 
 export interface PriceMatrixEntry {

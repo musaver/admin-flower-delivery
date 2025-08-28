@@ -4,6 +4,8 @@ import CurrencySymbol from '../components/CurrencySymbol';
 import { useCurrency } from '@/app/contexts/CurrencyContext';
 import { CurrencyCode } from '@/app/contexts/CurrencyContext';
 
+
+
 interface TaxSetting {
   enabled: boolean;
   type: 'percentage' | 'fixed';
@@ -47,21 +49,31 @@ export default function SettingsPage() {
     points_redemption_minimum: { value: 100, type: 'number', description: '' }
   });
 
+  // Appearance settings
+  const [appearanceSettings, setAppearanceSettings] = useState({
+    logo_url: '',
+    background_color: '#ffffff',
+    text_color: '#000000'
+  });
+  const [logoUploading, setLogoUploading] = useState(false);
+
   useEffect(() => {
     fetchSettings();
   }, []);
 
   const fetchSettings = async () => {
     try {
-      const [stockRes, taxRes, loyaltyRes] = await Promise.all([
+      const [stockRes, taxRes, loyaltyRes, appearanceRes] = await Promise.all([
         fetch('/api/settings/stock-management'),
         fetch('/api/settings/tax-settings'),
-        fetch('/api/settings/loyalty')
+        fetch('/api/settings/loyalty'),
+        fetch('/api/settings/appearance')
       ]);
       
       const stockData = await stockRes.json();
       const taxData = await taxRes.json();
       const loyaltyData = await loyaltyRes.json();
+      const appearanceData = await appearanceRes.json();
       
       setStockManagementEnabled(stockData.stockManagementEnabled);
       setVatTax(taxData.vatTax);
@@ -69,6 +81,10 @@ export default function SettingsPage() {
       
       if (loyaltyData.success) {
         setLoyaltySettings(loyaltyData.settings);
+      }
+
+      if (appearanceData.success) {
+        setAppearanceSettings(appearanceData.settings);
       }
     } catch (err) {
       console.error(err);
@@ -230,6 +246,182 @@ export default function SettingsPage() {
     }
   };
 
+  const handleLogoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setLogoUploading(true);
+      setError('');
+
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('directory', 'logos');
+
+      const response = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to upload logo');
+      }
+
+      const data = await response.json();
+      setAppearanceSettings(prev => ({
+        ...prev,
+        logo_url: data.url
+      }));
+
+      setSuccess('Logo uploaded successfully');
+      setTimeout(() => setSuccess(''), 3000);
+      
+      // Trigger logo update event
+      window.dispatchEvent(new Event('logoUpdated'));
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLogoUploading(false);
+    }
+  };
+
+  const handleColorChange = (colorType: 'background_color' | 'text_color', color: string) => {
+    setAppearanceSettings(prev => ({
+      ...prev,
+      [colorType]: color
+    }));
+  };
+
+  const handleSaveAppearanceSettings = async () => {
+    try {
+      setSaving(true);
+      setError('');
+
+      const response = await fetch('/api/settings/appearance', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ settings: appearanceSettings })
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to update appearance settings');
+      }
+
+      setSuccess('Appearance settings updated successfully');
+      setTimeout(() => setSuccess(''), 3000);
+      
+      // Trigger logo update event
+      window.dispatchEvent(new Event('logoUpdated'));
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleRemoveLogo = async () => {
+    if (confirm('Are you sure you want to remove the logo?')) {
+      try {
+        setAppearanceSettings(prev => ({
+          ...prev,
+          logo_url: ''
+        }));
+
+        // Save the updated settings
+        const response = await fetch('/api/settings/appearance', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            settings: { 
+              ...appearanceSettings, 
+              logo_url: '' 
+            } 
+          })
+        });
+
+        if (response.ok) {
+          setSuccess('Logo removed successfully');
+          setTimeout(() => setSuccess(''), 3000);
+          
+          // Trigger logo update event
+          window.dispatchEvent(new Event('logoUpdated'));
+        }
+      } catch (err: any) {
+        setError('Failed to remove logo');
+        setTimeout(() => setError(''), 3000);
+      }
+    }
+  };
+
+  const getColorFromImage = (imageElement: HTMLImageElement, x: number, y: number): string => {
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return '#000000';
+
+    // Set canvas size to match image display size
+    const rect = imageElement.getBoundingClientRect();
+    canvas.width = imageElement.naturalWidth;
+    canvas.height = imageElement.naturalHeight;
+
+    // Draw the image on canvas
+    ctx.drawImage(imageElement, 0, 0);
+
+    // Calculate the actual pixel position based on image scaling
+    const scaleX = imageElement.naturalWidth / rect.width;
+    const scaleY = imageElement.naturalHeight / rect.height;
+    
+    const pixelX = Math.floor(x * scaleX);
+    const pixelY = Math.floor(y * scaleY);
+
+    // Get pixel color data
+    const imageData = ctx.getImageData(pixelX, pixelY, 1, 1);
+    const [r, g, b] = imageData.data;
+
+    // Convert to hex
+    const hex = '#' + [r, g, b].map(x => {
+      const hex = x.toString(16);
+      return hex.length === 1 ? '0' + hex : hex;
+    }).join('');
+
+    return hex;
+  };
+
+  const handleLogoColorPick = (colorType: 'background_color' | 'text_color') => {
+    if (!appearanceSettings.logo_url) {
+      setError('Please upload a logo first to pick colors from it.');
+      setTimeout(() => setError(''), 3000);
+      return;
+    }
+
+    setSuccess('Click anywhere on your logo to pick a color!');
+    setTimeout(() => setSuccess(''), 3000);
+
+    // Add click event to logo
+    const logoImg = document.querySelector('.logo-color-picker') as HTMLImageElement;
+    if (logoImg) {
+      const handleLogoClick = (event: MouseEvent) => {
+        event.preventDefault();
+        const rect = logoImg.getBoundingClientRect();
+        const x = event.clientX - rect.left;
+        const y = event.clientY - rect.top;
+        
+        const color = getColorFromImage(logoImg, x, y);
+        handleColorChange(colorType, color);
+        //setSuccess(`Color picked from logo: ${color}`);
+        //setTimeout(() => setSuccess(''), 2000);
+
+        // Remove the click listener
+        logoImg.removeEventListener('click', handleLogoClick);
+        logoImg.style.cursor = 'default';
+      };
+
+      logoImg.addEventListener('click', handleLogoClick);
+      logoImg.style.cursor = 'crosshair';
+    }
+  };
+
   if (loading) return <div className="p-8">Loading settings...</div>;
 
   return (
@@ -249,6 +441,255 @@ export default function SettingsPage() {
       )}
 
       <div className="space-y-8">
+        {/* Appearance Settings Section */}
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+          <div className="mb-6">
+            <h2 className="text-xl font-semibold text-gray-800">Appearance Settings</h2>
+            <p className="text-gray-600 text-sm mt-1">
+              Customize the look and feel of your application
+            </p>
+          </div>
+
+          <div className="space-y-6">
+            {/* Logo Upload Section */}
+            <div>
+              <h3 className="text-lg font-medium text-gray-700 mb-4">Logo</h3>
+              <div className="flex items-start space-x-6">
+                {/* Logo Preview */}
+                <div className="flex-shrink-0">
+                  <div className="w-32 h-32 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center bg-gray-50 relative">
+                    {appearanceSettings.logo_url ? (
+                      <>
+                        <img
+                          src={appearanceSettings.logo_url}
+                          alt="Logo preview"
+                          className="max-w-full max-h-full object-contain rounded-lg logo-color-picker transition-all duration-200"
+                          crossOrigin="anonymous"
+                        />
+                        <div className="absolute bottom-1 right-1 bg-blue-500 text-white text-xs px-1.5 py-0.5 rounded text-center opacity-75">
+                          Click to pick colors
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleRemoveLogo}
+                          className="absolute top-1 right-1 bg-red-500 hover:bg-red-600 text-white rounded-full w-6 h-6 flex items-center justify-center transition-colors opacity-75 hover:opacity-100"
+                          title="Remove logo"
+                        >
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </>
+                    ) : (
+                      <div className="text-center text-gray-400">
+                        <svg className="w-8 h-8 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                        <p className="text-xs">No logo</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Upload Controls */}
+                <div className="flex-1">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Upload Logo
+                  </label>
+                  <div className="space-y-3">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleLogoUpload}
+                      disabled={logoUploading}
+                      className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 disabled:opacity-50"
+                    />
+                    {logoUploading && (
+                      <div className="flex items-center text-sm text-blue-600">
+                        <svg className="animate-spin -ml-1 mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                        </svg>
+                        Uploading...
+                      </div>
+                    )}
+                    <p className="text-xs text-gray-500">
+                      Recommended: PNG or JPG, max 5MB. Square format works best.
+                    </p>
+                    {appearanceSettings.logo_url && (
+                      <button
+                        type="button"
+                        onClick={handleRemoveLogo}
+                        className="mt-3 flex items-center text-sm text-red-600 hover:text-red-800 transition-colors"
+                      >
+                        <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                        Remove Logo
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Color Pickers Section */}
+            <div className="border-t pt-6">
+              <h3 className="text-lg font-medium text-gray-700 mb-2">Colors</h3>
+              <p className="text-sm text-gray-600 mb-4">
+                Set your brand colors manually or use the color picker tool (⭐) to pick colors directly from your uploaded logo.
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Background Color */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-3">
+                    Main Background Color
+                  </label>
+                  <div className="flex items-center space-x-3">
+                    <input
+                      type="color"
+                      value={appearanceSettings.background_color}
+                      onChange={(e) => handleColorChange('background_color', e.target.value)}
+                      className="w-12 h-12 rounded-lg border-2 border-gray-300 cursor-pointer"
+                    />
+                    <div className="flex-1">
+                      <input
+                        type="text"
+                        value={appearanceSettings.background_color}
+                        onChange={(e) => handleColorChange('background_color', e.target.value)}
+                        className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 font-mono text-sm"
+                        placeholder="#ffffff"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleLogoColorPick('background_color')}
+                      disabled={!appearanceSettings.logo_url}
+                      className={`flex items-center justify-center w-10 h-10 rounded-lg border-2 transition-colors relative group ${
+                        appearanceSettings.logo_url 
+                          ? 'border-gray-300 hover:border-blue-400 hover:bg-blue-50 cursor-pointer text-gray-600 hover:text-blue-600' 
+                          : 'border-gray-200 cursor-not-allowed text-gray-400'
+                      }`}
+                    >
+                      <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                      </svg>
+                      
+                      {/* Tooltip */}
+                      <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 text-sm text-white bg-gray-900 rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50">
+                        {appearanceSettings.logo_url 
+                          ? "🎨 Click to pick background color from your logo!" 
+                          : "⚠️ Upload a logo first to pick colors"
+                        }
+                        <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900"></div>
+                      </div>
+                    </button>
+                  </div>
+                  <div className="mt-2 p-3 rounded-md border" style={{ backgroundColor: appearanceSettings.background_color }}>
+                    <p className="text-sm text-gray-600">Background preview</p>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    ⭐ Click the star button to pick colors directly from your logo (works in all browsers)
+                  </p>
+                </div>
+
+                {/* Text Color */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-3">
+                    Main Text Color
+                  </label>
+                  <div className="flex items-center space-x-3">
+                    <input
+                      type="color"
+                      value={appearanceSettings.text_color}
+                      onChange={(e) => handleColorChange('text_color', e.target.value)}
+                      className="w-12 h-12 rounded-lg border-2 border-gray-300 cursor-pointer"
+                    />
+                    <div className="flex-1">
+                      <input
+                        type="text"
+                        value={appearanceSettings.text_color}
+                        onChange={(e) => handleColorChange('text_color', e.target.value)}
+                        className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 font-mono text-sm"
+                        placeholder="#000000"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleLogoColorPick('text_color')}
+                      disabled={!appearanceSettings.logo_url}
+                      className={`flex items-center justify-center w-10 h-10 rounded-lg border-2 transition-colors relative group ${
+                        appearanceSettings.logo_url 
+                          ? 'border-gray-300 hover:border-blue-400 hover:bg-blue-50 cursor-pointer text-gray-600 hover:text-blue-600' 
+                          : 'border-gray-200 cursor-not-allowed text-gray-400'
+                      }`}
+                    >
+                      <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                      </svg>
+                      
+                      {/* Tooltip */}
+                      <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 text-sm text-white bg-gray-900 rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50">
+                        {appearanceSettings.logo_url 
+                          ? "🎨 Click to pick text color from your logo!" 
+                          : "⚠️ Upload a logo first to pick colors"
+                        }
+                        <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900"></div>
+                      </div>
+                    </button>
+                  </div>
+                  <div className="mt-2 p-3 rounded-md border bg-white">
+                    <p className="text-sm" style={{ color: appearanceSettings.text_color }}>Text color preview</p>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    ⭐ Click the star button to pick colors directly from your logo (works in all browsers)
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Combined Preview */}
+            <div className="border-t pt-6">
+              <h3 className="text-lg font-medium text-gray-700 mb-4">Preview</h3>
+              <div 
+                className="p-6 rounded-lg border-2 border-gray-200"
+                style={{ 
+                  backgroundColor: appearanceSettings.background_color,
+                  color: appearanceSettings.text_color 
+                }}
+              >
+                <div className="flex items-center space-x-4 mb-4">
+                  {appearanceSettings.logo_url && (
+                    <img
+                      src={appearanceSettings.logo_url}
+                      alt="Logo"
+                      className="w-12 h-12 object-contain"
+                    />
+                  )}
+                  <div>
+                    <h4 className="text-xl font-semibold">Your Application</h4>
+                    <p className="text-sm opacity-75">This is how your branding will look</p>
+                  </div>
+                </div>
+                <p className="text-sm">
+                  Sample content with your chosen colors and logo. The background and text colors will be applied throughout your application.
+                </p>
+              </div>
+            </div>
+
+            {/* Save Button */}
+            <div className="flex justify-end pt-4">
+              <button
+                onClick={handleSaveAppearanceSettings}
+                disabled={saving}
+                className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {saving ? 'Saving...' : 'Save Appearance Settings'}
+              </button>
+            </div>
+          </div>
+        </div>
+
         {/* Stock Management Section */}
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
           <div className="flex items-center justify-between mb-4">
@@ -288,7 +729,7 @@ export default function SettingsPage() {
         </div>
 
         {/* Currency Settings Section */}
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hidden">
           <div className="mb-6">
             <h2 className="text-xl font-semibold text-gray-800">Currency Settings</h2>
             <p className="text-gray-600 text-sm mt-1">
@@ -349,7 +790,7 @@ export default function SettingsPage() {
         </div>
 
         {/* Tax Settings Section */}
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hidden">
           <div className="mb-6">
             <h2 className="text-xl font-semibold text-gray-800">Tax Configuration</h2>
             <p className="text-gray-600 text-sm mt-1">

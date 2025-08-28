@@ -85,6 +85,7 @@ interface GeneratedVariant {
   inventoryQuantity: number;
   image: string;
   isActive: boolean;
+  outOfStock: boolean;
 }
 
 interface Addon {
@@ -158,6 +159,7 @@ export default function AddProduct() {
     isDigital: false,
     requiresShipping: true,
     taxable: true,
+    outOfStock: false,
     metaTitle: '',
     metaDescription: '',
     productType: 'simple', // 'simple' or 'variable'
@@ -525,7 +527,8 @@ export default function AddProduct() {
         weight: formData.weight || '',
         inventoryQuantity: 0,
         image: '',
-        isActive: true
+        isActive: true,
+        outOfStock: false
       };
     });
 
@@ -640,7 +643,7 @@ export default function AddProduct() {
       
       <form onSubmit={handleSubmit} className="max-w-6xl">
         {/* Product Type Selection */}
-        <div className="mb-6 p-4 border rounded-lg bg-gray-50 hidden">
+        <div className="mb-6 p-4 border rounded-lg bg-gray-50">
           <h3 className="text-lg font-semibold mb-4">Product Type</h3>
           <div className="flex gap-4">
             <label className="flex items-center">
@@ -665,7 +668,7 @@ export default function AddProduct() {
               />
               Variable Product (with variations)
             </label>
-            <label className="flex items-center">
+            <label className="items-center hidden">
               <input
                 type="radio"
                 name="productType"
@@ -1045,7 +1048,21 @@ export default function AddProduct() {
                   />
                 </div>
 
-                <div className="hidden">
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    id="outOfStock"
+                    name="outOfStock"
+                    checked={formData.outOfStock}
+                    onChange={handleChange}
+                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                  />
+                  <label className="text-gray-700" htmlFor="outOfStock">
+                    Out of stock
+                  </label>
+                </div>
+
+                <div className="">
                   <label className="block text-gray-700 mb-2" htmlFor="costPrice">
                     Cost Price <span className="text-sm text-gray-500">(For profit tracking)</span>
                   </label>
@@ -1524,12 +1541,32 @@ export default function AddProduct() {
                                             placeholder="0.00"
                                           />
                                         </div>
+                                        <div>
+                                          <label className="block text-xs text-gray-600">Old Price <span className="text-gray-400">(Optional)</span></label>
+                                          <input
+                                            type="text"
+                                            value={variant.comparePrice}
+                                            onChange={(e) => updateVariant(variant.index, 'comparePrice', e.target.value)}
+                                            className="w-full p-1 text-sm border rounded"
+                                            placeholder="0.00"
+                                          />
+                                        </div>
+                                        <div>
+                                          <label className="block text-xs text-gray-600">Cost Price <span className="text-gray-400">(For profit)</span></label>
+                                          <input
+                                            type="text"
+                                            value={variant.costPrice}
+                                            onChange={(e) => updateVariant(variant.index, 'costPrice', e.target.value)}
+                                            className="w-full p-1 text-sm border rounded"
+                                            placeholder="0.00"
+                                          />
+                                        </div>
                                       </div>
                                     </div>
 
 
                                     {/* Actions */}
-                                    <div className="lg:col-span-2 flex gap-2">
+                                    <div className="lg:col-span-2 flex flex-col gap-2">
                                       <label className="flex items-center">
                                         <input
                                           type="checkbox"
@@ -1538,6 +1575,15 @@ export default function AddProduct() {
                                           className="mr-1"
                                         />
                                         <span className="text-sm">Active</span>
+                                      </label>
+                                      <label className="flex items-center">
+                                        <input
+                                          type="checkbox"
+                                          checked={variant.outOfStock}
+                                          onChange={(e) => updateVariant(variant.index, 'outOfStock', e.target.checked)}
+                                          className="mr-1"
+                                        />
+                                        <span className="text-sm">Out of stock</span>
                                       </label>
                                     </div>
                                   </div>
@@ -1735,7 +1781,7 @@ export default function AddProduct() {
         <div className="mt-6">
           <h3 className="text-lg font-semibold mb-4">Settings</h3>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-            <label className="flex items-center hidden">
+            <label className="items-center hidden">
               <input
                 type="checkbox"
                 name="isFeatured"

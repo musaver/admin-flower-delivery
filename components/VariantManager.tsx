@@ -203,18 +203,26 @@ const VariantManager: React.FC<VariantManagerProps> = ({
                                 placeholder="0.00"
                               />
                             </div>
-                            {variant.comparePrice && (
-                              <div>
-                                <label className="block text-xs text-gray-600">Compare Price</label>
-                                <input
-                                  type="text"
-                                  value={variant.comparePrice}
-                                  onChange={(e) => onVariantUpdate(variant.id, 'comparePrice', e.target.value)}
-                                  className="w-full p-1 text-sm border rounded"
-                                  placeholder="0.00"
-                                />
-                              </div>
-                            )}
+                            <div>
+                              <label className="block text-xs text-gray-600">Old Price <span className="text-gray-400">(Optional)</span></label>
+                              <input
+                                type="text"
+                                value={variant.comparePrice || ''}
+                                onChange={(e) => onVariantUpdate(variant.id, 'comparePrice', e.target.value)}
+                                className="w-full p-1 text-sm border rounded"
+                                placeholder="0.00"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs text-gray-600">Cost Price <span className="text-gray-400">(For profit)</span></label>
+                              <input
+                                type="text"
+                                value={variant.costPrice || ''}
+                                onChange={(e) => onVariantUpdate(variant.id, 'costPrice', e.target.value)}
+                                className="w-full p-1 text-sm border rounded"
+                                placeholder="0.00"
+                              />
+                            </div>
                           </div>
                         ) : (
                           <div>
@@ -233,20 +241,32 @@ const VariantManager: React.FC<VariantManagerProps> = ({
 
                       {/* Actions */}
                       {isEditing && (
-                        <div className={`${bulkEdit ? 'lg:col-span-3' : 'lg:col-span-3'} flex gap-2`}>
-                          <label className="flex items-center">
-                            <input
-                              type="checkbox"
-                              checked={variant.isActive}
-                              onChange={(e) => onVariantUpdate(variant.id, 'isActive', e.target.checked)}
-                              className="mr-1"
-                            />
-                            <span className="text-sm">Active</span>
-                          </label>
+                        <div className={`${bulkEdit ? 'lg:col-span-3' : 'lg:col-span-3'} flex flex-col gap-2`}>
+                          <div className="flex gap-2">
+                            <label className="flex items-center">
+                              <input
+                                type="checkbox"
+                                checked={variant.isActive}
+                                onChange={(e) => onVariantUpdate(variant.id, 'isActive', e.target.checked)}
+                                className="mr-1"
+                              />
+                              <span className="text-sm">Active</span>
+                            </label>
+                            
+                            <label className="flex items-center">
+                              <input
+                                type="checkbox"
+                                checked={variant.outOfStock}
+                                onChange={(e) => onVariantUpdate(variant.id, 'outOfStock', e.target.checked)}
+                                className="mr-1"
+                              />
+                              <span className="text-sm">Out of stock</span>
+                            </label>
+                          </div>
                           
                           <button
                             onClick={() => onVariantDelete(variant.id)}
-                            className="px-2 py-1 bg-red-500 text-white rounded text-xs hover:bg-red-600"
+                            className="px-2 py-1 bg-red-500 text-white rounded text-xs hover:bg-red-600 self-start"
                           >
                             Delete
                           </button>

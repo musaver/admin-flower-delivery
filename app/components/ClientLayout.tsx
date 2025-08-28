@@ -31,16 +31,52 @@ import {
   SettingsIcon,
   LogOutIcon,
   XIcon,
-  ChevronLeftIcon,
-  ChevronRightIcon
+  MapPinIcon
 } from 'lucide-react';
 
 export default function ClientLayout({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [pendingOrdersCount, setPendingOrdersCount] = useState(0);
+  const [logoUrl, setLogoUrl] = useState<string>('');
   const pathname = usePathname();
   const { data: session, status } = useSession();
+
+  // Fetch logo URL
+  const fetchLogo = async () => {
+    try {
+      const response = await fetch('/api/settings/appearance');
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.settings.logo_url) {
+          setLogoUrl(data.settings.logo_url);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching logo:', error);
+    }
+  };
+
+  useEffect(() => {
+    if (session) {
+      fetchLogo();
+    }
+  }, [session]);
+
+  // Listen for logo updates
+  useEffect(() => {
+    if (session) {
+      const handleLogoUpdate = () => {
+        fetchLogo();
+      };
+      
+      // Listen for custom logo update event
+      window.addEventListener('logoUpdated', handleLogoUpdate);
+      
+      return () => {
+        window.removeEventListener('logoUpdated', handleLogoUpdate);
+      };
+    }
+  }, [session]);
 
   // Fetch pending orders count
   useEffect(() => {
@@ -78,24 +114,26 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
     { name: 'Dashboard', href: '/', icon: LayoutDashboardIcon, category: 'main' },
     { name: 'Customers', href: '/users', icon: UsersIcon, category: 'main' },
     { name: 'Products', href: '/products', icon: PackageIcon, category: 'main' },
-    /*{ name: 'Tags', href: '/tags', icon: TagIcon, category: 'main' },*/
+    /*{ name: 'Tags', href: '/tags', icon: TagIcon, category: 'main' },
     
-    { name: 'Inventory', href: '/inventory', icon: BarChart3Icon, category: 'operations' },
+    { name: 'Inventory', href: '/inventory', icon: BarChart3Icon, category: 'operations' },*/
     { name: 'Orders', href: '/orders', icon: ShoppingCartIcon, category: 'operations', badge: pendingOrdersCount > 0 ? pendingOrdersCount : null },
     { name: 'Drivers', href: '/drivers', icon: TruckIcon, category: 'operations' },
-    /*{ name: 'Reports', href: '/reports', icon: TrendingUpIcon, category: 'operations' },
-    { name: 'Returns', href: '/returns', icon: UndoIcon, category: 'operations' },
+    { name: 'Pickup Locations', href: '/pickup-locations', icon: MapPinIcon, category: 'operations' },
+    { name: 'Reports', href: '/reports', icon: TrendingUpIcon, category: 'operations' },
+    /*{ name: 'Returns', href: '/returns', icon: UndoIcon, category: 'operations' },
     { name: 'Refunds', href: '/refunds', icon: DollarSignIcon, category: 'operations' },
     { name: 'Shipping Labels', href: '/shipping-labels', icon: PackageCheckIcon, category: 'operations' },*/
     { name: 'Categories', href: '/categories', icon: FolderIcon, category: 'main' },
     /*{ name: 'Subcategories', href: '/subcategories', icon: FolderOpenIcon, category: 'catalog' },
-    { name: 'Addons', href: '/addons', icon: PuzzleIcon, category: 'catalog' },
-    { name: 'Tasks', href: '/variation-attributes', icon: TagIcon, category: 'catalog' },
-    { name: 'Product Variants', href: '/product-variants', icon: WrenchIcon, category: 'catalog' },
+    { name: 'Addons', href: '/addons', icon: PuzzleIcon, category: 'catalog' },*/
+    { name: 'Porudct Variations', href: '/variation-attributes', icon: TagIcon, category: 'main' },
+    /*{ name: 'Product Variants', href: '/product-variants', icon: WrenchIcon, category: 'main' },
     { name: 'Admin Users', href: '/admins', icon: ShieldIcon, category: 'admin' },
     { name: 'Admin Roles', href: '/roles', icon: LockIcon, category: 'admin' },
     { name: 'Admin Logs', href: '/logs', icon: FileTextIcon, category: 'admin' },
     { name: 'Settings', href: '/settings', icon: SettingsIcon, category: 'admin' },*/
+    { name: 'Settings', href: '/settings', icon: SettingsIcon, category: 'admin' },
     { name: 'Logout', href: '/logout', icon: LogOutIcon, category: 'admin' },
   ];
 
@@ -113,7 +151,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
     return pathname.startsWith(href);
   };
 
-  const NavItem = ({ item, mobile = false, collapsed = false }: { item: typeof navigation[0], mobile?: boolean, collapsed?: boolean }) => {
+  const NavItem = ({ item, mobile = false }: { item: typeof navigation[0], mobile?: boolean }) => {
     const active = isActive(item.href);
     const Icon = item.icon;
     
@@ -124,21 +162,11 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
           active ? 'bg-accent text-accent-foreground font-medium' : 'text-muted-foreground hover:text-foreground'
         }`}
         onClick={() => mobile && setSidebarOpen(false)}
-        title={collapsed ? item.name : undefined}
       >
         <Icon className="h-4 w-4 flex-shrink-0" />
-        {!collapsed && (
-          <>
-            <span className="truncate">{item.name}</span>
-            {item.badge && (
-              <Badge variant="secondary" className="ml-auto h-5 w-5 flex items-center justify-center p-0 text-xs">
-                {item.badge > 99 ? '99+' : item.badge}
-              </Badge>
-            )}
-          </>
-        )}
-        {collapsed && item.badge && (
-          <Badge variant="secondary" className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs">
+        <span className="truncate">{item.name}</span>
+        {item.badge && (
+          <Badge variant="secondary" className="ml-auto h-5 w-5 flex items-center justify-center p-0 text-xs">
             {item.badge > 99 ? '99+' : item.badge}
           </Badge>
         )}
@@ -149,10 +177,18 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
   const SidebarContent = ({ mobile = false }: { mobile?: boolean }) => (
     <div className="flex h-full max-h-screen flex-col gap-2 fixed">
       {/* Header */}
-      <div className={`flex h-14 items-center border-b pl-4 lg:h-[60px] lg:pl-6 ${sidebarCollapsed && !mobile ? 'justify-center' : ''}`}>
-        <Link href="/" className={`flex items-center gap-2 font-semibold ${sidebarCollapsed && !mobile ? 'justify-center' : ''}`}>
-          <LayoutDashboardIcon className="h-6 w-6 flex-shrink-0" />
-          {(!sidebarCollapsed || mobile) && <span className="truncate">Admin Panel</span>}
+      <div className="flex h-14 items-center border-b pl-4 lg:h-[60px] lg:pl-6">
+        <Link href="/" className="flex items-center gap-2 font-semibold">
+          {logoUrl ? (
+            <img 
+              src={logoUrl} 
+              alt="Logo" 
+              className="h-8 w-8 flex-shrink-0 object-contain rounded-md"
+            />
+          ) : (
+            <LayoutDashboardIcon className="h-6 w-6 flex-shrink-0" />
+          )}
+          <span className="truncate">Admin Panel</span>
         </Link>
         {mobile && (
           <Button
@@ -164,27 +200,6 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
             <XIcon className="h-4 w-4" />
           </Button>
         )}
-
-        {/* Collapse Toggle Button for Desktop */}
-      {!mobile && (
-        <div className="px-0 ml-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-            className={`w-full justify-center ${sidebarCollapsed ? '' : ''}`}
-          >
-            {sidebarCollapsed ? (
-              <ChevronRightIcon className="h-4 " />
-            ) : (
-              <>
-                <ChevronLeftIcon className="h-4 w-4 mr-2" />
-                Collapse
-              </>
-            )}
-          </Button>
-        </div>
-      )}
       </div>
 
       
@@ -194,19 +209,17 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
         <nav className="grid items-start px-2 text-sm font-medium lg:px-4">
           {Object.entries(categories).map(([key, category]) => (
             <div key={key} className="mb-4">
-              {(!sidebarCollapsed || mobile) && (
-                <div className="mb-2 px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                  {category.name}
-                </div>
-              )}
+              <div className="mb-2 px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                {category.name}
+              </div>
               <div className="space-y-1">
                 {category.items.map((item) => (
                   <div key={item.name} className="relative">
-                    <NavItem item={item} mobile={mobile} collapsed={sidebarCollapsed && !mobile} />
+                    <NavItem item={item} mobile={mobile} />
                   </div>
                 ))}
               </div>
-              {key !== 'admin' && (!sidebarCollapsed || mobile) && <Separator className="my-4" />}
+              {key !== 'admin' && <Separator className="my-4" />}
             </div>
           ))}
         </nav>
@@ -214,29 +227,25 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
 
       {/* User Profile */}
       <div className="mt-auto p-4">
-        <div className={`flex items-center gap-3 rounded-lg bg-muted/50 p-3 ${sidebarCollapsed && !mobile ? 'justify-center' : ''}`}>
+        <div className="flex items-center gap-3 rounded-lg bg-muted/50 p-3">
           <Avatar className="h-8 w-8 flex-shrink-0">
             <AvatarFallback>
               {session?.user?.email?.charAt(0).toUpperCase() || 'A'}
             </AvatarFallback>
           </Avatar>
-          {(!sidebarCollapsed || mobile) && (
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium truncate">
-                {session?.user?.email || 'Admin User'}
-              </p>
-              <p className="text-xs text-muted-foreground">Administrator</p>
-            </div>
-          )}
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium truncate">
+              {session?.user?.email || 'Admin User'}
+            </p>
+            <p className="text-xs text-muted-foreground">Administrator</p>
+          </div>
         </div>
       </div>
     </div>
   );
 
-  const sidebarWidth = sidebarCollapsed ? 'md:grid-cols-[80px_1fr] lg:grid-cols-[80px_1fr]' : 'md:grid-cols-[220px_1fr] lg:grid-cols-[280px_1fr]';
-
   return (
-    <div className={`grid min-h-screen w-full max-w-full overflow-hidden ${sidebarWidth}`}>
+    <div className="grid min-h-screen w-full max-w-full overflow-hidden md:grid-cols-[220px_1fr] lg:grid-cols-[280px_1fr]">
       {/* Desktop Sidebar */}
       <div className="hidden border-r bg-muted/40 md:block overflow-y-auto">
         <SidebarContent />
@@ -261,7 +270,14 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
               <SidebarContent mobile={true} />
             </SheetContent>
           </Sheet>
-          <div className="w-full flex-1 min-w-0">
+          <div className="w-full flex-1 min-w-0 flex items-center gap-2">
+            {logoUrl && (
+              <img 
+                src={logoUrl} 
+                alt="Logo" 
+                className="h-8 w-8 flex-shrink-0 object-contain rounded-md"
+              />
+            )}
             <h1 className="text-lg font-semibold truncate">Admin Panel</h1>
           </div>
         </header>

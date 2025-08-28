@@ -12,10 +12,10 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate file type
-    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/avif'];
     if (!allowedTypes.includes(file.type)) {
       return NextResponse.json({ 
-        error: 'Invalid file type. Only JPEG, PNG, and WebP images are allowed.' 
+        error: 'Invalid file type. Only JPEG, PNG, WebP, and AVIF images are allowed.' 
       }, { status: 400 });
     }
 
@@ -28,10 +28,10 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate directory parameter
-    const allowedDirectories = ['courses', 'batches', 'general', 'products', 'products/banner', 'category-icons'];
+    const allowedDirectories = ['courses', 'batches', 'general', 'products', 'products/banner', 'category-icons', 'logos'];
     if (!allowedDirectories.includes(directory)) {
       return NextResponse.json({ 
-        error: 'Invalid directory. Allowed directories: courses, batches, general, products, products/banner, category-icons' 
+        error: 'Invalid directory. Allowed directories: courses, batches, general, products, products/banner, category-icons, logos' 
       }, { status: 400 });
     }
 

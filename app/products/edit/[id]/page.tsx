@@ -99,6 +99,7 @@ export default function EditProduct() {
     isDigital: false,
     requiresShipping: true,
     taxable: true,
+    outOfStock: false,
     metaTitle: '',
     metaDescription: '',
     productType: 'simple',
@@ -199,6 +200,7 @@ export default function EditProduct() {
         isDigital: product.isDigital || false,
         requiresShipping: product.requiresShipping !== undefined ? product.requiresShipping : true,
         taxable: product.taxable !== undefined ? product.taxable : true,
+        outOfStock: product.outOfStock || false,
         metaTitle: product.metaTitle || '',
         metaDescription: product.metaDescription || '',
         productType: product.productType || 'simple',
@@ -289,14 +291,16 @@ export default function EditProduct() {
       setSelectedAddons(formattedProductAddons);
       
       // Convert existing product tags to our format
-      const formattedProductTags = Array.isArray(productTagsData) ? productTagsData.map((item: any) => ({
-        tagId: item.tag.id,
-        tagName: item.tag.name,
-        groupId: item.tag.groupId,
-        groupName: item.tag.group.name,
-        customValue: item.customValue,
-        color: item.tag.color || item.tag.group.color,
-      })) : [];
+      const formattedProductTags = Array.isArray(productTagsData) ? productTagsData
+        .filter((item: any) => item.tag && item.tag.id) // Filter out items with null tags
+        .map((item: any) => ({
+          tagId: item.tag.id,
+          tagName: item.tag.name,
+          groupId: item.tag.groupId,
+          groupName: item.tag.group?.name || 'Unknown Group',
+          customValue: item.customValue,
+          color: item.tag.color || item.tag.group?.color || '#gray',
+        })) : [];
       
       setSelectedTags(formattedProductTags);
       
@@ -1021,6 +1025,20 @@ export default function EditProduct() {
                   <p className="text-xs text-gray-500 mt-1">
                     Used to calculate profit margins and track business performance
                   </p>
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    id="outOfStock"
+                    name="outOfStock"
+                    checked={formData.outOfStock}
+                    onChange={handleChange}
+                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                  />
+                  <label className="text-gray-700" htmlFor="outOfStock">
+                    Out of stock
+                  </label>
                 </div>
               </>
             )}

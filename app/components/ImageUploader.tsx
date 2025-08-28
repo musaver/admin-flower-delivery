@@ -24,11 +24,17 @@ export default function ImageUploader({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const compressImage = async (file: File): Promise<File> => {
+    // AVIF files are already highly compressed, skip compression for them
+    if (file.type === 'image/avif') {
+      return file;
+    }
+
     const options = {
       maxSizeMB: 1, // Maximum file size in MB
       maxWidthOrHeight: 1920, // Maximum width or height
       useWebWorker: true,
-      fileType: 'image/jpeg', // Convert to JPEG for better compression
+      // Preserve original format for WebP and AVIF, convert others to JPEG
+      fileType: file.type === 'image/webp' ? 'image/webp' : 'image/jpeg',
     };
 
     try {
@@ -45,9 +51,9 @@ export default function ImageUploader({
     if (!file) return;
 
     // Validate file type
-    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/avif'];
     if (!allowedTypes.includes(file.type)) {
-      alert('Please select a valid image file (JPEG, PNG, or WebP)');
+      alert('Please select a valid image file (JPEG, PNG, WebP, or AVIF)');
       return;
     }
 
@@ -175,7 +181,7 @@ export default function ImageUploader({
       </div>
 
       <p className="text-xs text-gray-500">
-        Supports JPEG, PNG, WebP. Max size: 5MB. Images will be automatically compressed.
+        Supports JPEG, PNG, WebP, AVIF. Max size: 5MB. Images will be automatically compressed (except AVIF).
       </p>
     </div>
   );

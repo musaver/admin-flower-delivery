@@ -93,11 +93,21 @@ interface Customer {
   country?: string;
 }
 
+interface PickupLocation {
+  id: string;
+  name: string;
+  address: string;
+  latitude?: string;
+  longitude?: string;
+  isActive: boolean;
+}
+
 export default function AddOrder() {
   const router = useRouter();
   const { currentCurrency } = useCurrency();
   const [products, setProducts] = useState<Product[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
+  const [pickupLocations, setPickupLocations] = useState<PickupLocation[]>([]);
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -133,6 +143,9 @@ export default function AddOrder() {
     discountAmount: 0,
     discountType: 'amount', // 'amount' or 'percentage'
     currency: currentCurrency,
+    // Order type and pickup location fields
+    orderType: 'delivery',
+    pickupLocationId: '',
     // Driver assignment fields
     assignedDriverId: '',
     deliveryStatus: 'pending',
@@ -193,9 +206,10 @@ export default function AddOrder() {
 
   const fetchInitialData = async () => {
     try {
-      const [productsRes, customersRes, stockSettingRes, driversRes, loyaltyRes] = await Promise.all([
+      const [productsRes, customersRes, pickupLocationsRes, stockSettingRes, driversRes, loyaltyRes] = await Promise.all([
         fetch('/api/products'),
         fetch('/api/users'),
+        fetch('/api/pickup-locations?activeOnly=true'),
         fetch('/api/settings/stock-management'),
         fetch('/api/drivers/available?includeAll=true'),
         fetch('/api/settings/loyalty')
@@ -203,6 +217,7 @@ export default function AddOrder() {
 
       const productsData = await productsRes.json();
       const customersData = await customersRes.json();
+      const pickupLocationsData = await pickupLocationsRes.json();
       const stockData = await stockSettingRes.json();
       const driversData = await driversRes.json();
       const loyaltyData = await loyaltyRes.json();
@@ -241,6 +256,7 @@ export default function AddOrder() {
 
       setProducts(processedProducts);
       setCustomers(customersData);
+      setPickupLocations(pickupLocationsData || []);
       setStockManagementEnabled(stockData.stockManagementEnabled || true);
       setAvailableDrivers(driversData.drivers || []);
       
@@ -684,6 +700,12 @@ export default function AddOrder() {
       return;
     }
 
+    if (orderData.orderType === 'pickup' && !orderData.pickupLocationId) {
+      setError('Please select a pickup location for pickup orders');
+      setSubmitting(false);
+      return;
+    }
+
     try {
       const totals = calculateTotals();
       
@@ -700,6 +722,10 @@ export default function AddOrder() {
         totalAmount: totals.totalAmount,
         currency: orderData.currency,
         notes: orderData.notes,
+        
+        // Order type and pickup location fields
+        orderType: orderData.orderType,
+        pickupLocationId: orderData.pickupLocationId || null,
         
         // Driver assignment fields
         assignedDriverId: orderData.assignedDriverId || null,
@@ -901,6 +927,78 @@ export default function AddOrder() {
                   <option value="cancelled">Cancelled</option>
                 </select>
               </div>
+            </div>
+          </div>
+
+          {/* Order Type and Pickup Location */}
+          <div className="bg-white border rounded-lg p-6">
+            <h3 className="text-lg font-semibold mb-4">🚚 Order Type</h3>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-gray-700 mb-2">Order Type</label>
+                <div className="flex gap-4">
+                  <label className="flex items-center">
+                    <input
+                      type="radio"
+                      name="orderType"
+                      value="delivery"
+                      checked={orderData.orderType === 'delivery'}
+                      onChange={(e) => setOrderData({...orderData, orderType: e.target.value, pickupLocationId: ''})}
+                      className="mr-2"
+                    />
+                    🚚 Delivery
+                  </label>
+                  <label className="flex items-center">
+                    <input
+                      type="radio"
+                      name="orderType"
+                      value="pickup"
+                      checked={orderData.orderType === 'pickup'}
+                      onChange={(e) => setOrderData({...orderData, orderType: e.target.value})}
+                      className="mr-2"
+                    />
+                    📍 Pickup
+                  </label>
+                </div>
+              </div>
+
+              {orderData.orderType === 'pickup' && (
+                <div>
+                  <label className="block text-gray-700 mb-2">Pickup Location <span className="text-red-500">*</span></label>
+                  <select
+                    value={orderData.pickupLocationId}
+                    onChange={(e) => setOrderData({...orderData, pickupLocationId: e.target.value})}
+                    className="w-full p-2 border rounded focus:border-blue-500 focus:outline-none"
+                    required={orderData.orderType === 'pickup'}
+                  >
+                    <option value="">-- Select a pickup location --</option>
+                    {pickupLocations.map(location => (
+                      <option key={location.id} value={location.id}>
+                        {location.name} - {location.address}
+                      </option>
+                    ))}
+                  </select>
+                  {pickupLocations.length === 0 && (
+                    <p className="text-sm text-red-500 mt-1">
+                      No active pickup locations available. Please create one first.
+                    </p>
+                  )}
+                  {orderData.orderType === 'pickup' && !orderData.pickupLocationId && pickupLocations.length > 0 && (
+                    <p className="text-sm text-orange-600 mt-1">
+                      Please select a pickup location for pickup orders.
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {orderData.orderType === 'delivery' && (
+                <div className="bg-blue-50 p-3 rounded">
+                  <p className="text-sm text-blue-700">
+                    📦 This order will be delivered to the customer's address. Make sure to fill in the shipping address below.
+                  </p>
+                </div>
+              )}
             </div>
           </div>
 

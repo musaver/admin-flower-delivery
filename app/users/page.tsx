@@ -29,6 +29,7 @@ interface User {
   country?: string;
   city?: string;
   address?: string;
+  status?: string;
   createdAt: string;
   loyaltyPoints?: {
     availablePoints: number;
@@ -43,13 +44,27 @@ export default function UsersList() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importResults, setImportResults] = useState<{
+    total: number;
+    success: number;
+    errors: string[];
+  } | null>(null);
 
   const fetchUsers = async () => {
     setLoading(true);
     try {
       const res = await fetch('/api/users');
       const data = await res.json();
-      setUsers(data);
+      // Sort users by created date (most recent first)
+      const sortedUsers = (data || []).sort((a: User, b: User) => {
+        const dateA = new Date(a.createdAt || 0).getTime();
+        const dateB = new Date(b.createdAt || 0).getTime();
+        return dateB - dateA; // Most recent first
+      });
+      setUsers(sortedUsers);
     } catch (err) {
       console.error(err);
     } finally {
@@ -72,12 +87,47 @@ export default function UsersList() {
     }
   };
 
+  const handleStatusToggle = async (id: string, currentStatus: string) => {
+    const newStatus = currentStatus === 'pending' ? 'approved' : 'pending';
+    const user = users.find(u => u.id === id);
+    const userName = user?.name || user?.email || 'this user';
+    
+    const action = newStatus === 'approved' ? 'approve' : 'set as pending';
+    const confirmMessage = `Are you sure you want to ${action} ${userName}?`;
+    
+    if (!confirm(confirmMessage)) {
+      return;
+    }
+    
+    try {
+      const response = await fetch(`/api/users/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ status: newStatus }),
+      });
+
+      if (response.ok) {
+        setUsers(users.map(user => 
+          user.id === id ? { ...user, status: newStatus } : user
+        ));
+      } else {
+        console.error('Failed to update user status');
+        alert('Failed to update user status');
+      }
+    } catch (error) {
+      console.error('Error updating user status:', error);
+      alert('Error updating user status');
+    }
+  };
+
   const exportUsers = async () => {
     setExporting(true);
     try {
       // Convert users data to CSV format
       const csvHeaders = [
-        'ID', 'Name', 'Email', 'Phone', 'Country', 'City', 'Address', 'Created At',
+        'ID', 'Name', 'Email', 'Phone', 'Country', 'City', 'Address', 'Status', 'Created At',
         'Available Points', 'Pending Points', 'Total Earned', 'Total Redeemed', 'Expiring Soon'
       ];
       const csvData = users.map((user) => [
@@ -88,6 +138,7 @@ export default function UsersList() {
         user.country || '',
         user.city || '',
         user.address || '',
+        user.status || 'pending',
         user.createdAt ? new Date(user.createdAt).toLocaleString() : '',
         user.loyaltyPoints?.availablePoints || 0,
         user.loyaltyPoints?.pendingPoints || 0,
@@ -120,10 +171,87 @@ export default function UsersList() {
     }
   };
 
+  const downloadTemplate = () => {
+    const templateHeaders = ['Name', 'Phone', 'Email', 'Notes', 'Date Created'];
+    const sampleData = [
+      ['John Doe', '+1234567890', 'john.doe@example.com', 'Sample user notes', '2024-01-15'],
+      ['Jane Smith', '+1987654321', 'jane.smith@example.com', 'Another sample user', '2024-01-16'],
+      ['Bob Johnson', '+1555123456', 'bob.johnson@example.com', '', '2024-01-17']
+    ];
+
+    const csvContent = [
+      templateHeaders.join(','),
+      ...sampleData.map(row => row.map(field => `"${field}"`).join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', 'users_import_template.csv');
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      const validTypes = [
+        'text/csv',
+        'application/vnd.ms-excel',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      ];
+      
+      if (validTypes.includes(file.type) || file.name.endsWith('.csv') || file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
+        setImportFile(file);
+        setImportResults(null);
+      } else {
+        alert('Please select a valid CSV or Excel file.');
+        event.target.value = '';
+      }
+    }
+  };
+
+  const handleImport = async () => {
+    if (!importFile) return;
+
+    setImporting(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', importFile);
+
+      const response = await fetch('/api/users/import', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const result = await response.json();
+
+      if (response.ok) {
+        setImportResults(result);
+        fetchUsers(); // Refresh the users list
+        setImportFile(null);
+      } else {
+        alert(result.error || 'Failed to import users');
+      }
+    } catch (error) {
+      console.error('Error importing users:', error);
+      alert('Failed to import users');
+    } finally {
+      setImporting(false);
+    }
+  };
+
   const getStats = () => {
     const totalUsers = users.length;
     const usersWithPhone = users.filter(user => user.phone).length;
     const usersWithAddress = users.filter(user => user.address).length;
+    
+    // Status stats
+    const approvedUsers = users.filter(user => user.status === 'approved').length;
+    const pendingUsers = users.filter(user => user.status === 'pending' || !user.status).length;
     
     // Loyalty points stats
     const usersWithPoints = users.filter(user => user.loyaltyPoints && user.loyaltyPoints.availablePoints > 0).length;
@@ -136,6 +264,8 @@ export default function UsersList() {
       totalUsers, 
       usersWithPhone, 
       usersWithAddress,
+      approvedUsers,
+      pendingUsers,
       usersWithPoints,
       totalAvailablePoints,
       totalPointsEarned,
@@ -179,6 +309,32 @@ export default function UsersList() {
         </div>
       ),
       mobileHidden: true
+    },
+    {
+      key: 'status',
+      title: 'Status',
+      render: (_: any, user: User) => (
+        <div className="flex items-center space-x-2">
+          <Badge 
+            variant={user.status === 'approved' ? 'default' : 'secondary'}
+            className={`text-xs ${
+              user.status === 'approved' 
+                ? 'bg-green-100 text-green-800 border-green-200'
+                : 'bg-yellow-100 text-yellow-800 border-yellow-200'
+            }`}
+          >
+            {user.status === 'approved' ? 'Approved' : 'Pending'}
+          </Badge>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => handleStatusToggle(user.id, user.status || 'pending')}
+            className="h-6 px-2 text-xs"
+          >
+            {user.status === 'approved' ? 'Set Pending' : 'Approve'}
+          </Button>
+        </div>
+      ),
     },
     {
       key: 'loyaltyPoints',
@@ -283,6 +439,16 @@ export default function UsersList() {
         </div>
         <div className="flex items-center space-x-2">
           <Button 
+            onClick={() => setShowImportModal(true)} 
+            variant="outline" 
+            size="sm"
+          >
+            <svg className="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
+            </svg>
+            Import Users
+          </Button>
+          <Button 
             onClick={exportUsers} 
             disabled={exporting || users.length === 0} 
             variant="outline" 
@@ -305,7 +471,7 @@ export default function UsersList() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-8">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Users</CardTitle>
@@ -313,6 +479,24 @@ export default function UsersList() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.totalUsers}</div>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Approved</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-600">{stats.approvedUsers}</div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Pending</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-yellow-600">{stats.pendingUsers}</div>
           </CardContent>
         </Card>
         
@@ -330,7 +514,7 @@ export default function UsersList() {
             <CardTitle className="text-sm font-medium">With Address</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">{stats.usersWithAddress}</div>
+            <div className="text-2xl font-bold text-purple-600">{stats.usersWithAddress}</div>
           </CardContent>
         </Card>
 
@@ -371,6 +555,149 @@ export default function UsersList() {
         emptyMessage="No users found"
         actions={renderActions}
       />
+
+      {/* Import Modal */}
+      {showImportModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold">Import Users</h3>
+              <button
+                onClick={() => {
+                  setShowImportModal(false);
+                  setImportFile(null);
+                  setImportResults(null);
+                }}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {!importResults ? (
+              <div className="space-y-4">
+                <div>
+                  <p className="text-sm text-gray-600 mb-3">
+                    Upload a CSV or Excel file with user data. Required columns: Name, Phone, Email, Notes, Date Created.
+                  </p>
+                  
+                  <div className="mb-4">
+                    <Button
+                      onClick={downloadTemplate}
+                      variant="outline"
+                      size="sm"
+                      className="w-full"
+                    >
+                      <DownloadIcon className="h-4 w-4 mr-2" />
+                      Download Sample Template
+                    </Button>
+                  </div>
+
+                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+                    <input
+                      type="file"
+                      accept=".csv,.xlsx,.xls"
+                      onChange={handleFileSelect}
+                      className="hidden"
+                      id="import-file"
+                    />
+                    <label htmlFor="import-file" className="cursor-pointer">
+                      <div className="text-gray-400 mb-2">
+                        <svg className="w-12 h-12 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
+                        </svg>
+                      </div>
+                      <p className="text-sm text-gray-600">
+                        Click to select a file or drag and drop
+                      </p>
+                      <p className="text-xs text-gray-400 mt-1">
+                        CSV, XLS, XLSX files supported
+                      </p>
+                    </label>
+                  </div>
+
+                  {importFile && (
+                    <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+                      <p className="text-sm text-blue-800">
+                        Selected: {importFile.name}
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex space-x-3">
+                  <Button
+                    onClick={() => {
+                      setShowImportModal(false);
+                      setImportFile(null);
+                    }}
+                    variant="outline"
+                    className="flex-1"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={handleImport}
+                    disabled={!importFile || importing}
+                    className="flex-1"
+                  >
+                    {importing ? 'Importing...' : 'Import Users'}
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="text-center">
+                  <div className="text-green-600 mb-2">
+                    <svg className="w-12 h-12 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <h4 className="text-lg font-semibold">Import Complete</h4>
+                </div>
+
+                <div className="bg-gray-50 rounded-lg p-4 space-y-2">
+                  <div className="flex justify-between">
+                    <span className="text-sm text-gray-600">Total Records:</span>
+                    <span className="text-sm font-medium">{importResults.total}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-gray-600">Successfully Imported:</span>
+                    <span className="text-sm font-medium text-green-600">{importResults.success}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-gray-600">Errors:</span>
+                    <span className="text-sm font-medium text-red-600">{importResults.errors.length}</span>
+                  </div>
+                </div>
+
+                {importResults.errors.length > 0 && (
+                  <div className="max-h-40 overflow-y-auto">
+                    <h5 className="text-sm font-medium text-red-600 mb-2">Errors:</h5>
+                    <ul className="text-xs text-red-600 space-y-1">
+                      {importResults.errors.map((error, index) => (
+                        <li key={index}>• {error}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                <Button
+                  onClick={() => {
+                    setShowImportModal(false);
+                    setImportResults(null);
+                  }}
+                  className="w-full"
+                >
+                  Close
+                </Button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 } 

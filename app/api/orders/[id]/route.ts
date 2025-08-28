@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { orders, orderItems, productInventory, stockMovements, user, products, userLoyaltyPoints, loyaltyPointsHistory, settings } from '@/lib/schema';
+import { orders, orderItems, productInventory, stockMovements, user, products, userLoyaltyPoints, loyaltyPointsHistory, settings, pickupLocations } from '@/lib/schema';
 import { v4 as uuidv4 } from 'uuid';
 import { eq, and, isNull } from 'drizzle-orm';
 import { getStockManagementSettingDirect } from '@/lib/stockManagement';
@@ -10,14 +10,16 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   try {
     const { id: orderId } = await params;
 
-    // Fetch order with customer information
+    // Fetch order with customer information and pickup location
     const orderData = await db
       .select({
         order: orders,
         user: user,
+        pickupLocation: pickupLocations,
       })
       .from(orders)
       .leftJoin(user, eq(orders.userId, user.id))
+      .leftJoin(pickupLocations, eq(orders.pickupLocationId, pickupLocations.id))
       .where(eq(orders.id, orderId))
       .limit(1);
 
@@ -40,6 +42,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     const order = {
       ...orderData[0].order,
       user: orderData[0].user,
+      pickupLocation: orderData[0].pickupLocation,
       items: itemsWithParsedAddons
     };
 
@@ -69,6 +72,9 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       deliveryStatus,
       previousStatus,
       previousPaymentStatus,
+      // Order type and pickup location fields
+      orderType,
+      pickupLocationId,
       // Loyalty points fields
       pointsToRedeem,
       pointsDiscountAmount
@@ -135,6 +141,9 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     if (cancelReason !== undefined) updateData.cancelReason = cancelReason;
     if (assignedDriverId !== undefined) updateData.assignedDriverId = assignedDriverId || null;
     if (deliveryStatus !== undefined) updateData.deliveryStatus = deliveryStatus;
+    // Order type and pickup location fields
+    if (orderType !== undefined) updateData.orderType = orderType;
+    if (pickupLocationId !== undefined) updateData.pickupLocationId = pickupLocationId || null;
     if (pointsToRedeem !== undefined) updateData.pointsToRedeem = pointsToRedeem;
     if (pointsDiscountAmount !== undefined) updateData.pointsDiscountAmount = pointsDiscountAmount;
     if (newTotalAmount !== Number(order.totalAmount)) updateData.totalAmount = newTotalAmount;

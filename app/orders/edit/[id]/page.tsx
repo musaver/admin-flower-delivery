@@ -7,6 +7,15 @@ import {
   isWeightBasedProduct 
 } from '@/utils/weightUtils';
 
+interface PickupLocation {
+  id: string;
+  name: string;
+  address: string;
+  latitude?: string;
+  longitude?: string;
+  isActive: boolean;
+}
+
 interface Order {
   id: string;
   orderNumber: string;
@@ -23,6 +32,10 @@ interface Order {
   totalAmount: number;
   currency: string;
   notes?: string;
+  
+  // Order type and pickup location fields
+  orderType?: string;
+  pickupLocationId?: string;
   
   // Billing address
   billingFirstName?: string;
@@ -57,6 +70,7 @@ interface Order {
     name?: string;
     email: string;
   };
+  pickupLocation?: PickupLocation;
 }
 
 interface OrderItem {
@@ -94,6 +108,7 @@ export default function EditOrder() {
   const [error, setError] = useState('');
   const [stockManagementEnabled, setStockManagementEnabled] = useState(true);
   const [availableDrivers, setAvailableDrivers] = useState<any[]>([]);
+  const [pickupLocations, setPickupLocations] = useState<PickupLocation[]>([]);
   
   // Loyalty points state
   const [loyaltySettings, setLoyaltySettings] = useState({
@@ -124,6 +139,9 @@ export default function EditOrder() {
     cancelReason: '',
     assignedDriverId: '',
     deliveryStatus: 'pending',
+    // Order type and pickup location fields
+    orderType: 'delivery',
+    pickupLocationId: '',
     // Loyalty points fields
     pointsToRedeem: 0,
     pointsDiscountAmount: 0,
@@ -184,10 +202,11 @@ export default function EditOrder() {
       fetchOrder(id);
     }
     
-    // Fetch stock management setting, addons, drivers, and loyalty settings
+    // Fetch stock management setting, addons, drivers, pickup locations, and loyalty settings
     fetchStockManagementSetting();
     fetchAddons();
     fetchDrivers();
+    fetchPickupLocations();
     fetchLoyaltySettings();
   }, []);
 
@@ -220,6 +239,18 @@ export default function EditOrder() {
       setAvailableDrivers(data.drivers || []);
     } catch (error) {
       console.error('Error fetching drivers:', error);
+    }
+  };
+
+  const fetchPickupLocations = async () => {
+    try {
+      const response = await fetch('/api/pickup-locations?activeOnly=true');
+      if (response.ok) {
+        const data = await response.json();
+        setPickupLocations(data || []);
+      }
+    } catch (err) {
+      console.error('Error fetching pickup locations:', err);
     }
   };
 
@@ -358,6 +389,9 @@ export default function EditOrder() {
         cancelReason: orderData.cancelReason || '',
         assignedDriverId: orderData.assignedDriverId || '',
         deliveryStatus: orderData.deliveryStatus || 'pending',
+        // Order type and pickup location fields
+        orderType: orderData.orderType || 'delivery',
+        pickupLocationId: orderData.pickupLocationId || '',
         // Loyalty points fields
         pointsToRedeem: Number(orderData.pointsToRedeem) || 0,
         pointsDiscountAmount: Number(orderData.pointsDiscountAmount) || 0,
@@ -712,6 +746,47 @@ export default function EditOrder() {
                     {fulfillmentStatuses.find(s => s.value === editData.fulfillmentStatus)?.description}
                   </div>
                 </div>
+
+                <div>
+                  <label className="block text-gray-700 mb-2">Order Type</label>
+                  <select
+                    value={editData.orderType}
+                    onChange={(e) => handleStatusChange('orderType', e.target.value)}
+                    className="w-full p-2 border rounded focus:border-blue-500 focus:outline-none"
+                  >
+                    <option value="delivery">🚚 Delivery</option>
+                    <option value="pickup">📍 Pickup</option>
+                  </select>
+                  <div className="text-xs text-gray-500 mt-1">
+                    {editData.orderType === 'delivery' ? 'Order will be delivered to customer' : 'Customer will pick up at location'}
+                  </div>
+                </div>
+
+                {editData.orderType === 'pickup' && (
+                  <div>
+                    <label className="block text-gray-700 mb-2">Pickup Location</label>
+                    <select
+                      value={editData.pickupLocationId}
+                      onChange={(e) => handleStatusChange('pickupLocationId', e.target.value)}
+                      className="w-full p-2 border rounded focus:border-blue-500 focus:outline-none"
+                    >
+                      <option value="">-- Select pickup location --</option>
+                      {pickupLocations.map(location => (
+                        <option key={location.id} value={location.id}>
+                          {location.name} - {location.address}
+                        </option>
+                      ))}
+                    </select>
+                    {pickupLocations.length === 0 && (
+                      <div className="text-xs text-red-500 mt-1">No pickup locations available</div>
+                    )}
+                    {order.pickupLocation && (
+                      <div className="text-xs text-green-600 mt-1">
+                        Current: {order.pickupLocation.name} - {order.pickupLocation.address}
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 <div>
                   <label className="block text-gray-700 mb-2">Assigned Driver</label>

@@ -29,11 +29,19 @@ export const user = mysqlTable('user', {
   address: varchar("address", { length: 255 }),
   state: varchar("state", { length: 100 }),
   postalCode: varchar("postal_code", { length: 20 }),
+  latitude: decimal("latitude", { precision: 10, scale: 8 }),
+  longitude: decimal("longitude", { precision: 11, scale: 8 }),
   userType: varchar("user_type", { length: 20 }).default("customer"), // customer, driver, admin
+  status: varchar("status", { length: 20 }).default("pending"), // pending, approved, suspended
   newsletter: boolean("newsletter").default(false),
   dateOfBirth: datetime("date_of_birth"),
   otp: varchar("otp", { length: 6 }),
   otpExpiry: datetime("otp_expiry"),
+  // Notification preferences
+  notifyOrderUpdates: boolean("notify_order_updates").default(true),
+  notifyPromotions: boolean("notify_promotions").default(false),
+  notifyDriverMessages: boolean("notify_driver_messages").default(true),
+  note: text("note"), // Additional user note field
   createdAt: datetime("created_at").default(sql`CURRENT_TIMESTAMP`),
   updatedAt: datetime("updated_at").default(sql`CURRENT_TIMESTAMP`),
 });
@@ -134,8 +142,10 @@ export const products = mysqlTable("products", {
   isDigital: boolean("is_digital").default(false),
   requiresShipping: boolean("requires_shipping").default(true),
   taxable: boolean("taxable").default(true),
+  outOfStock: boolean("out_of_stock").default(false),
   metaTitle: varchar("meta_title", { length: 255 }),
   metaDescription: text("meta_description"),
+
   
   // Variable Product Fields
   productType: varchar("product_type", { length: 50 }).default("simple"), // 'simple' or 'variable'
@@ -174,6 +184,7 @@ export const productVariants = mysqlTable("product_variants", {
   allowBackorder: boolean("allow_backorder").default(false),
   variantOptions: json("variant_options"), // {color: "Red", size: "Large"}
   isActive: boolean("is_active").default(true),
+  outOfStock: boolean("out_of_stock").default(false),
   createdAt: datetime("created_at").default(sql`CURRENT_TIMESTAMP`),
   updatedAt: datetime("updated_at").default(sql`CURRENT_TIMESTAMP`),
 });
@@ -336,19 +347,26 @@ export const orders = mysqlTable("orders", {
   shippingState: varchar("shipping_state", { length: 100 }),
   shippingPostalCode: varchar("shipping_postal_code", { length: 20 }),
   shippingCountry: varchar("shipping_country", { length: 100 }),
+  shippingLatitude: decimal("shipping_latitude", { precision: 10, scale: 8 }),
+  shippingLongitude: decimal("shipping_longitude", { precision: 11, scale: 8 }),
   
   shippingMethod: varchar("shipping_method", { length: 100 }),
   trackingNumber: varchar("tracking_number", { length: 255 }),
   notes: text("notes"),
+  deliveryInstructions: text("delivery_instructions"),
   cancelReason: text("cancel_reason"),
   
   // Service scheduling fields
   serviceDate: varchar("service_date", { length: 10 }), // YYYY-MM-DD format
   serviceTime: varchar("service_time", { length: 8 }), // HH:MM format
   
+  // Order type and pickup location fields
+  orderType: varchar("order_type", { length: 20 }).default("delivery"), // delivery, pickup
+  pickupLocationId: varchar("pickup_location_id", { length: 255 }), // Reference to pickup_locations
+  
   // Driver assignment fields
   assignedDriverId: varchar("assigned_driver_id", { length: 255 }), // Current assigned driver
-  deliveryStatus: varchar("delivery_status", { length: 30 }).default("pending"), // pending, assigned, picked_up, out_for_delivery, delivered, failed
+  deliveryStatus: varchar("delivery_status", { length: 30 }).default("pending"), // pending, assigned, out_for_delivery, delivered, failed
   
   // Loyalty points fields
   pointsToRedeem: int("points_to_redeem").default(0), // Points redeemed for this order
@@ -478,20 +496,21 @@ export const adminLogs = mysqlTable("admin_logs", {
 export const drivers = mysqlTable("drivers", {
   id: varchar("id", { length: 255 }).primaryKey(),
   userId: varchar("user_id", { length: 255 }).notNull().unique(), // Reference to user table
-  licenseNumber: varchar("license_number", { length: 100 }).unique(),
-  vehicleType: varchar("vehicle_type", { length: 100 }), // car, motorcycle, truck, van
+  licenseNumber: varchar("license_number", { length: 100 }).notNull().unique(),
+  vehicleType: varchar("vehicle_type", { length: 100 }).notNull(), // car, motorcycle, truck, van
   vehicleMake: varchar("vehicle_make", { length: 100 }),
   vehicleModel: varchar("vehicle_model", { length: 100 }),
   vehicleYear: int("vehicle_year"),
-  vehiclePlateNumber: varchar("vehicle_plate_number", { length: 50 }),
+  vehiclePlateNumber: varchar("vehicle_plate_number", { length: 50 }).notNull(),
   vehicleColor: varchar("vehicle_color", { length: 50 }),
   
   // Location fields
-  baseLocation: varchar("base_location", { length: 255 }), // Fixed base location address
+  baseLocation: varchar("base_location", { length: 255 }).notNull(), // Fixed base location address
   baseLatitude: decimal("base_latitude", { precision: 10, scale: 8 }), // GPS coordinates
   baseLongitude: decimal("base_longitude", { precision: 11, scale: 8 }),
   currentLatitude: decimal("current_latitude", { precision: 10, scale: 8 }), // Current location
   currentLongitude: decimal("current_longitude", { precision: 11, scale: 8 }),
+  currentAddress: varchar("current_address", { length: 500 }), // Current location address
   
   // Status and availability
   status: varchar("status", { length: 20 }).default("offline"), // available, busy, offline
@@ -522,7 +541,7 @@ export const driverAssignments = mysqlTable("driver_assignments", {
   priority: varchar("priority", { length: 20 }).default("normal"), // low, normal, high, urgent
   
   // Delivery status tracking
-  deliveryStatus: varchar("delivery_status", { length: 30 }).default("assigned"), // assigned, picked_up, out_for_delivery, delivered, failed
+  deliveryStatus: varchar("delivery_status", { length: 30 }).default("assigned"), // assigned, out_for_delivery, delivered, failed
   pickedUpAt: datetime("picked_up_at"),
   outForDeliveryAt: datetime("out_for_delivery_at"),
   deliveredAt: datetime("delivered_at"),
@@ -711,6 +730,10 @@ export const ordersRelations = relations(orders, ({ one, many }) => ({
   assignedDriver: one(drivers, {
     fields: [orders.assignedDriverId],
     references: [drivers.id],
+  }),
+  pickupLocation: one(pickupLocations, {
+    fields: [orders.pickupLocationId],
+    references: [pickupLocations.id],
   }),
   orderItems: many(orderItems),
   returns: many(returns),
@@ -972,4 +995,156 @@ export const updatedProductsRelations = relations(products, ({ one, many }) => (
   orderItems: many(orderItems),
   productAddons: many(productAddons),
   productTags: many(productTags),
+}));
+
+// Twilio Conversations - for managing Twilio chat sessions between drivers and users
+export const twilioConversations = mysqlTable("twilio_conversations", {
+  id: varchar("id", { length: 255 }).primaryKey(),
+  orderId: varchar("order_id", { length: 255 }).notNull(), // Reference to active order
+  userId: varchar("user_id", { length: 255 }).notNull(), // Customer
+  driverId: varchar("driver_id", { length: 255 }).notNull(), // Assigned driver
+  twilioConversationSid: varchar("twilio_conversation_sid", { length: 255 }).notNull().unique(), // Twilio conversation SID
+  status: varchar("status", { length: 20 }).default("active"), // active, closed
+  createdAt: datetime("created_at").default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: datetime("updated_at").default(sql`CURRENT_TIMESTAMP`),
+});
+
+// Twilio Call Sessions - for managing voice calls between drivers and users
+export const twilioCallSessions = mysqlTable("twilio_call_sessions", {
+  id: varchar("id", { length: 255 }).primaryKey(),
+  conversationId: varchar("conversation_id", { length: 255 }).notNull(), // Reference to twilio_conversations
+  callerId: varchar("caller_id", { length: 255 }).notNull(), // Who initiated the call
+  receiverId: varchar("receiver_id", { length: 255 }).notNull(), // Who received the call
+  callType: varchar("call_type", { length: 10 }).default("voice"), // voice or video
+  twilioCallSid: varchar("twilio_call_sid", { length: 255 }), // Twilio call SID
+  status: varchar("status", { length: 20 }).default("initiated"), // initiated, ringing, answered, ended, missed
+  startedAt: datetime("started_at"),
+  endedAt: datetime("ended_at"),
+  duration: int("duration").default(0), // in seconds
+  createdAt: datetime("created_at").default(sql`CURRENT_TIMESTAMP`),
+});
+
+// Twilio Conversations Relations
+export const twilioConversationsRelations = relations(twilioConversations, ({ one, many }) => ({
+  order: one(orders, {
+    fields: [twilioConversations.orderId],
+    references: [orders.id],
+  }),
+  user: one(user, {
+    fields: [twilioConversations.userId],
+    references: [user.id],
+  }),
+  driver: one(drivers, {
+    fields: [twilioConversations.driverId],
+    references: [drivers.id],
+  }),
+  callSessions: many(twilioCallSessions),
+}));
+
+// Twilio Call Sessions Relations
+export const twilioCallSessionsRelations = relations(twilioCallSessions, ({ one }) => ({
+  conversation: one(twilioConversations, {
+    fields: [twilioCallSessions.conversationId],
+    references: [twilioConversations.id],
+  }),
+  caller: one(user, {
+    fields: [twilioCallSessions.callerId],
+    references: [user.id],
+  }),
+  receiver: one(user, {
+    fields: [twilioCallSessions.receiverId],
+    references: [user.id],
+  }),
+}));
+
+// ✅ Chat Conversations (1-on-1 between customer and driver)
+export const chatConversations = mysqlTable("chat_conversations", {
+  id: varchar("id", { length: 255 }).primaryKey(),
+  customerId: varchar("customer_id", { length: 255 }).notNull(),
+  driverId: varchar("driver_id", { length: 255 }).notNull(),
+  orderId: varchar("order_id", { length: 255 }), // Optional: link to specific order
+  agoraChannelName: varchar("agora_channel_name", { length: 255 }).notNull(),
+  isActive: boolean("is_active").default(true),
+  lastMessageAt: datetime("last_message_at"),
+  createdAt: datetime("created_at").default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: datetime("updated_at").default(sql`CURRENT_TIMESTAMP`),
+});
+
+// ✅ Chat Messages
+export const chatMessages = mysqlTable("chat_messages", {
+  id: varchar("id", { length: 255 }).primaryKey(),
+  conversationId: varchar("conversation_id", { length: 255 }).notNull(),
+  senderId: varchar("sender_id", { length: 255 }).notNull(),
+  message: text("message").notNull(),
+  messageType: varchar("message_type", { length: 50 }).default("text"), // text, system
+  isRead: boolean("is_read").default(false),
+  createdAt: datetime("created_at").default(sql`CURRENT_TIMESTAMP`),
+});
+
+// Chat Relations
+export const chatConversationsRelations = relations(chatConversations, ({ one, many }) => ({
+  customer: one(user, {
+    fields: [chatConversations.customerId],
+    references: [user.id],
+  }),
+  driver: one(user, {
+    fields: [chatConversations.driverId],
+    references: [user.id],
+  }),
+  order: one(orders, {
+    fields: [chatConversations.orderId],
+    references: [orders.id],
+  }),
+  messages: many(chatMessages),
+}));
+
+export const chatMessagesRelations = relations(chatMessages, ({ one }) => ({
+  conversation: one(chatConversations, {
+    fields: [chatMessages.conversationId],
+    references: [chatConversations.id],
+  }),
+  sender: one(user, {
+    fields: [chatMessages.senderId],
+    references: [user.id],
+  }),
+}));
+
+// Driver Order Rejections - track which orders drivers have rejected
+export const driverOrderRejections = mysqlTable("driver_order_rejections", {
+  id: varchar("id", { length: 255 }).primaryKey(),
+  driverId: varchar("driver_id", { length: 255 }).notNull(), // Reference to drivers table
+  orderId: varchar("order_id", { length: 255 }).notNull(), // Reference to orders table
+  rejectedAt: datetime("rejected_at").default(sql`CURRENT_TIMESTAMP`),
+  reason: text("reason"), // Optional reason for rejection
+  createdAt: datetime("created_at").default(sql`CURRENT_TIMESTAMP`),
+});
+
+// Driver Order Rejections Relations
+export const driverOrderRejectionsRelations = relations(driverOrderRejections, ({ one }) => ({
+  driver: one(drivers, {
+    fields: [driverOrderRejections.driverId],
+    references: [drivers.id],
+  }),
+  order: one(orders, {
+    fields: [driverOrderRejections.orderId],
+    references: [orders.id],
+  }),
+}));
+
+// Pickup Locations
+export const pickupLocations = mysqlTable("pickup_locations", {
+  id: varchar("id", { length: 255 }).primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  address: text("address").notNull(),
+  instructions: text("instructions"), // Special instructions for pickup
+  latitude: decimal("latitude", { precision: 10, scale: 8 }),
+  longitude: decimal("longitude", { precision: 11, scale: 8 }),
+  isActive: boolean("is_active").default(true),
+  createdAt: datetime("created_at").default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: datetime("updated_at").default(sql`CURRENT_TIMESTAMP`),
+});
+
+// Pickup Locations Relations
+export const pickupLocationsRelations = relations(pickupLocations, ({ many }) => ({
+  orders: many(orders),
 }));

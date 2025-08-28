@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { orders, orderItems, productInventory, stockMovements, products, productVariants, user, drivers, userLoyaltyPoints, loyaltyPointsHistory, settings } from '@/lib/schema';
+import { orders, orderItems, productInventory, stockMovements, products, productVariants, user, drivers, userLoyaltyPoints, loyaltyPointsHistory, settings, pickupLocations } from '@/lib/schema';
 import { v4 as uuidv4 } from 'uuid';
 import { eq, and, isNull, desc, or } from 'drizzle-orm';
 import { getStockManagementSettingDirect } from '@/lib/stockManagement';
@@ -18,14 +18,16 @@ export async function GET(req: NextRequest) {
       whereConditions.push(eq(orders.assignedDriverId, assignedDriverId));
     }
 
-    // Fetch orders with their items, customer information, and assigned driver
+    // Fetch orders with their items, customer information, pickup location, and assigned driver
     const ordersWithDetails = await db
       .select({
         order: orders,
         user: user,
+        pickupLocation: pickupLocations,
       })
       .from(orders)
       .leftJoin(user, eq(orders.userId, user.id))
+      .leftJoin(pickupLocations, eq(orders.pickupLocationId, pickupLocations.id))
       .where(whereConditions.length > 0 ? and(...whereConditions) : undefined)
       .orderBy(desc(orders.createdAt));
 
@@ -73,6 +75,7 @@ export async function GET(req: NextRequest) {
         return {
           ...orderData.order,
           user: orderData.user,
+          pickupLocation: orderData.pickupLocation,
           items: itemsWithParsedAddons,
           assignedDriver
         };
@@ -102,6 +105,10 @@ export async function POST(req: NextRequest) {
       totalAmount,
       currency = 'USD',
       notes,
+      
+      // Order type and pickup location fields
+      orderType = 'delivery',
+      pickupLocationId,
       
       // Driver assignment fields
       assignedDriverId,
@@ -246,6 +253,10 @@ export async function POST(req: NextRequest) {
       discountAmount: discountAmount || 0,
       totalAmount,
       currency,
+      
+      // Order type and pickup location fields
+      orderType,
+      pickupLocationId: pickupLocationId || null,
       
       // Driver assignment fields
       assignedDriverId: assignedDriverId || null,
