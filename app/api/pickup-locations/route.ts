@@ -9,13 +9,17 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const activeOnly = searchParams.get('activeOnly') === 'true';
     
-    let query = db.select().from(pickupLocations);
+    const baseQuery = db.select().from(pickupLocations);
     
+    let locations;
     if (activeOnly) {
-      query = query.where(eq(pickupLocations.isActive, true));
+      locations = await baseQuery
+        .where(eq(pickupLocations.isActive, true))
+        .orderBy(desc(pickupLocations.createdAt));
+    } else {
+      locations = await baseQuery
+        .orderBy(desc(pickupLocations.createdAt));
     }
-    
-    const locations = await query.orderBy(desc(pickupLocations.createdAt));
     
     return NextResponse.json(locations);
   } catch (error) {

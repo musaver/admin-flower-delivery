@@ -21,7 +21,7 @@ interface PickupLocation {
   updatedAt: string;
 }
 
-export default function EditPickupLocationPage({ params }: { params: { id: string } }) {
+export default function EditPickupLocationPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [formData, setFormData] = useState({
@@ -34,14 +34,20 @@ export default function EditPickupLocationPage({ params }: { params: { id: strin
   });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [locationId, setLocationId] = useState<string>('');
 
   useEffect(() => {
-    fetchLocation();
-  }, [params.id]);
+    const initializeParams = async () => {
+      const { id } = await params;
+      setLocationId(id);
+      fetchLocation(id);
+    };
+    initializeParams();
+  }, [params]);
 
-  const fetchLocation = async () => {
+  const fetchLocation = async (id: string) => {
     try {
-      const response = await fetch(`/api/pickup-locations/${params.id}`);
+      const response = await fetch(`/api/pickup-locations/${id}`);
       if (!response.ok) {
         throw new Error('Failed to fetch pickup location');
       }
@@ -89,7 +95,7 @@ export default function EditPickupLocationPage({ params }: { params: { id: strin
     }
 
     try {
-      const response = await fetch(`/api/pickup-locations/${params.id}`, {
+      const response = await fetch(`/api/pickup-locations/${locationId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

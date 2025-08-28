@@ -3,12 +3,13 @@ import { db } from '@/lib/db';
 import { pickupLocations } from '@/lib/schema';
 import { eq } from 'drizzle-orm';
 
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params;
     const location = await db
       .select()
       .from(pickupLocations)
-      .where(eq(pickupLocations.id, params.id))
+      .where(eq(pickupLocations.id, id))
       .limit(1);
 
     if (location.length === 0) {
@@ -22,8 +23,9 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   }
 }
 
-export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params;
     const body = await req.json();
     const { name, address, instructions, latitude, longitude, isActive } = body;
 
@@ -36,7 +38,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     const existingLocation = await db
       .select()
       .from(pickupLocations)
-      .where(eq(pickupLocations.id, params.id))
+      .where(eq(pickupLocations.id, id))
       .limit(1);
 
     if (existingLocation.length === 0) {
@@ -55,13 +57,13 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
         isActive: isActive !== undefined ? isActive : existingLocation[0].isActive,
         updatedAt: new Date(),
       })
-      .where(eq(pickupLocations.id, params.id));
+      .where(eq(pickupLocations.id, id));
 
     // Fetch the updated location
     const updatedLocation = await db
       .select()
       .from(pickupLocations)
-      .where(eq(pickupLocations.id, params.id))
+      .where(eq(pickupLocations.id, id))
       .limit(1);
 
     return NextResponse.json(updatedLocation[0]);
@@ -71,13 +73,14 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
   }
 }
 
-export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params;
     // Check if location exists
     const existingLocation = await db
       .select()
       .from(pickupLocations)
-      .where(eq(pickupLocations.id, params.id))
+      .where(eq(pickupLocations.id, id))
       .limit(1);
 
     if (existingLocation.length === 0) {
@@ -90,7 +93,7 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
     
     await db
       .delete(pickupLocations)
-      .where(eq(pickupLocations.id, params.id));
+      .where(eq(pickupLocations.id, id));
 
     return NextResponse.json({ message: 'Pickup location deleted successfully' });
   } catch (error) {
