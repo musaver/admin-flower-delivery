@@ -27,6 +27,7 @@ interface ProfitReportData {
     orderNumber: string;
     email: string;
     status: string;
+    orderType: string;
     createdAt: string;
     items: Array<{
       id: string;
@@ -71,6 +72,8 @@ export default function ProfitsReport() {
     return date.toLocaleDateString('en-US', options).replace(',', ' at');
   };
   const [data, setData] = useState<ProfitReportData | null>(null);
+  const [pickupData, setPickupData] = useState<ProfitReportData | null>(null);
+  const [deliveryData, setDeliveryData] = useState<ProfitReportData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   
@@ -78,6 +81,7 @@ export default function ProfitsReport() {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [selectedProductId, setSelectedProductId] = useState('');
+  const [activeTab, setActiveTab] = useState<'all' | 'pickup' | 'delivery'>('all');
   const [expandedOrders, setExpandedOrders] = useState<Set<string>>(new Set());
 
   // Available products for filtering
@@ -98,9 +102,14 @@ export default function ProfitsReport() {
     try {
       const response = await fetch('/api/products');
       const productsData = await response.json();
-      setProducts(productsData);
+      // Ensure we have valid products data and filter out any invalid entries
+      const validProducts = Array.isArray(productsData) 
+        ? productsData.filter(product => product && product.id && product.name)
+        : [];
+      setProducts(validProducts);
     } catch (error) {
       console.error('Failed to fetch products:', error);
+      setProducts([]); // Set empty array on error
     }
   };
 
@@ -109,22 +118,50 @@ export default function ProfitsReport() {
     setError('');
     
     try {
-      const params = new URLSearchParams();
-      if (startDate) params.append('startDate', startDate);
-      if (endDate) params.append('endDate', endDate);
-      if (selectedProductId) params.append('productId', selectedProductId);
+      const baseParams = new URLSearchParams();
+      if (startDate) baseParams.append('startDate', startDate);
+      if (endDate) baseParams.append('endDate', endDate);
+      if (selectedProductId) baseParams.append('productId', selectedProductId);
 
-      const response = await fetch(`/api/reports/profits?${params.toString()}`);
-      if (!response.ok) {
+      // Fetch all orders data
+      const allResponse = await fetch(`/api/reports/profits?${baseParams.toString()}`);
+      if (!allResponse.ok) {
         throw new Error('Failed to fetch profit data');
       }
-      
-      const result = await response.json();
-      setData(result);
+      const allResult = await allResponse.json();
+      setData(allResult);
+
+      // Fetch pickup orders data
+      const pickupParams = new URLSearchParams(baseParams);
+      pickupParams.append('orderType', 'pickup');
+      const pickupResponse = await fetch(`/api/reports/profits?${pickupParams.toString()}`);
+      if (!pickupResponse.ok) {
+        throw new Error('Failed to fetch pickup profit data');
+      }
+      const pickupResult = await pickupResponse.json();
+      setPickupData(pickupResult);
+
+      // Fetch delivery orders data
+      const deliveryParams = new URLSearchParams(baseParams);
+      deliveryParams.append('orderType', 'delivery');
+      const deliveryResponse = await fetch(`/api/reports/profits?${deliveryParams.toString()}`);
+      if (!deliveryResponse.ok) {
+        throw new Error('Failed to fetch delivery profit data');
+      }
+      const deliveryResult = await deliveryResponse.json();
+      setDeliveryData(deliveryResult);
     } catch (err: any) {
       setError(err.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const getCurrentData = () => {
+    switch (activeTab) {
+      case 'pickup': return pickupData;
+      case 'delivery': return deliveryData;
+      default: return data;
     }
   };
 
@@ -133,13 +170,15 @@ export default function ProfitsReport() {
     if (startDate) params.append('startDate', startDate);
     if (endDate) params.append('endDate', endDate);
     if (selectedProductId) params.append('productId', selectedProductId);
+    if (activeTab !== 'all') params.append('orderType', activeTab);
     params.append('export', 'csv');
 
     window.open(`/api/reports/profits?${params.toString()}`, '_blank');
   };
 
   const handleExportPDF = async () => {
-    if (!data) return;
+    const currentData = getCurrentData();
+    if (!currentData) return;
     
     try {
       // Dynamic import to avoid build issues
@@ -149,7 +188,8 @@ export default function ProfitsReport() {
       
       // Title
       doc.setFontSize(20);
-      doc.text('Profit & Loss Report', 20, 20);
+      const reportTitle = `Profit & Loss Report${activeTab !== 'all' ? ` - ${activeTab.charAt(0).toUpperCase() + activeTab.slice(1)} Orders` : ''}`;
+      doc.text(reportTitle, 20, 20);
       
       // Date range
       if (startDate || endDate) {
@@ -162,12 +202,12 @@ export default function ProfitsReport() {
       doc.setFontSize(14);
       doc.text('Summary', 20, 45);
       doc.setFontSize(10);
-      doc.text(`Total Revenue: $${data.summary.totalRevenue.toFixed(2)}`, 20, 55);
-      doc.text(`Total Cost: $${data.summary.totalCost.toFixed(2)}`, 20, 62);
-      doc.text(`Total Profit: $${data.summary.totalProfit.toFixed(2)}`, 20, 69);
-      doc.text(`Average Margin: ${data.summary.averageMargin.toFixed(1)}%`, 20, 76);
-      doc.text(`Profitable Items: ${data.summary.profitableItems}`, 20, 83);
-      doc.text(`Loss Items: ${data.summary.lossItems}`, 20, 90);
+      doc.text(`Total Revenue: $${currentData.summary.totalRevenue.toFixed(2)}`, 20, 55);
+      doc.text(`Total Cost: $${currentData.summary.totalCost.toFixed(2)}`, 20, 62);
+      doc.text(`Total Profit: $${currentData.summary.totalProfit.toFixed(2)}`, 20, 69);
+      doc.text(`Average Margin: ${currentData.summary.averageMargin.toFixed(1)}%`, 20, 76);
+      doc.text(`Profitable Items: ${currentData.summary.profitableItems}`, 20, 83);
+      doc.text(`Loss Items: ${currentData.summary.lossItems}`, 20, 90);
       
       // Orders data (simplified without table plugin)
       let yPosition = 100;
@@ -175,7 +215,7 @@ export default function ProfitsReport() {
       doc.text('Orders:', 20, yPosition);
       yPosition += 10;
       
-      data.orders.slice(0, 10).forEach((order, index) => {
+      currentData.orders.slice(0, 10).forEach((order, index) => {
         doc.setFontSize(8);
         const orderText = `${order.orderNumber} | ${new Date(order.createdAt).toLocaleDateString()} | $${order.orderSummary.totalRevenue.toFixed(2)} | $${order.orderSummary.totalProfit.toFixed(2)}`;
         doc.text(orderText, 20, yPosition);
@@ -238,15 +278,15 @@ export default function ProfitsReport() {
         <div className="flex gap-3">
           <button
             onClick={handleExportCSV}
-            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-            disabled={!data}
+            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={!getCurrentData()}
           >
             📊 Export CSV
           </button>
           <button
             onClick={handleExportPDF}
-            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-            disabled={!data}
+            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={!getCurrentData()}
           >
             📄 Export PDF
           </button>
@@ -292,8 +332,8 @@ export default function ProfitsReport() {
               className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             >
               <option value="">All Products</option>
-              {products.map(product => (
-                <option key={product.id} value={product.id}>{product.name}</option>
+              {products.map((product, index) => (
+                <option key={product.id || `product-${index}`} value={product.id || ''}>{product.name || 'Unnamed Product'}</option>
               ))}
             </select>
           </div>
@@ -331,6 +371,54 @@ export default function ProfitsReport() {
         )}
       </div>
 
+      {/* Order Type Tabs */}
+      <div className="bg-white rounded-xl shadow-lg border p-6 mb-6">
+        <h3 className="text-lg font-semibold text-gray-800 mb-4">📊 Report Type</h3>
+        <div className="flex space-x-1 bg-gray-100 p-1 rounded-lg">
+          <button
+            onClick={() => setActiveTab('all')}
+            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+              activeTab === 'all'
+                ? 'bg-white text-blue-600 shadow-sm'
+                : 'text-gray-600 hover:text-gray-800'
+            }`}
+          >
+            All Orders
+          </button>
+          <button
+            onClick={() => setActiveTab('pickup')}
+            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+              activeTab === 'pickup'
+                ? 'bg-white text-blue-600 shadow-sm'
+                : 'text-gray-600 hover:text-gray-800'
+            }`}
+          >
+            🏪 Pickup Orders
+          </button>
+          <button
+            onClick={() => setActiveTab('delivery')}
+            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+              activeTab === 'delivery'
+                ? 'bg-white text-blue-600 shadow-sm'
+                : 'text-gray-600 hover:text-gray-800'
+            }`}
+          >
+            🚚 Delivery Orders
+          </button>
+        </div>
+        
+        {/* Tab Content Summary */}
+        <div className="mt-4 p-4 bg-blue-50 rounded-lg">
+          <p className="text-sm text-blue-700">
+            <span className="font-medium">Currently viewing:</span> {
+              activeTab === 'all' ? 'All orders (pickup and delivery combined)' :
+              activeTab === 'pickup' ? 'Pickup orders only' :
+              'Delivery orders only'
+            }
+          </p>
+        </div>
+      </div>
+
       {error && (
         <div className="mb-6 p-4 bg-red-100 border border-red-300 text-red-700 rounded-lg">
           <div className="flex items-center">
@@ -340,7 +428,9 @@ export default function ProfitsReport() {
         </div>
       )}
 
-      {data && (
+      {(() => {
+        const currentData = getCurrentData();
+        return currentData && (
         <>
           {/* Summary Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
@@ -349,7 +439,7 @@ export default function ProfitsReport() {
                 <div>
                   <p className="text-sm font-medium text-gray-600">Total Revenue</p>
                   <p className="text-2xl font-bold text-blue-600">
-                    <CurrencySymbol />{data.summary.totalRevenue.toFixed(2)}
+                    <CurrencySymbol />{currentData.summary.totalRevenue.toFixed(2)}
                   </p>
                 </div>
                 <div className="text-3xl">💰</div>
@@ -361,7 +451,7 @@ export default function ProfitsReport() {
                 <div>
                   <p className="text-sm font-medium text-gray-600">Total Cost</p>
                   <p className="text-2xl font-bold text-orange-600">
-                    <CurrencySymbol />{data.summary.totalCost.toFixed(2)}
+                    <CurrencySymbol />{currentData.summary.totalCost.toFixed(2)}
                   </p>
                 </div>
                 <div className="text-3xl">💸</div>
@@ -372,12 +462,12 @@ export default function ProfitsReport() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-600">Total Profit</p>
-                  <p className={`text-2xl font-bold ${data.summary.totalProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                    <CurrencySymbol />{data.summary.totalProfit.toFixed(2)}
+                  <p className={`text-2xl font-bold ${currentData.summary.totalProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    <CurrencySymbol />{currentData.summary.totalProfit.toFixed(2)}
                   </p>
                 </div>
                 <div className="text-3xl">
-                  {data.summary.totalProfit >= 0 ? '📈' : '📉'}
+                  {currentData.summary.totalProfit >= 0 ? '📈' : '📉'}
                 </div>
               </div>
             </div>
@@ -386,8 +476,8 @@ export default function ProfitsReport() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-600">Average Margin</p>
-                  <p className={`text-2xl font-bold ${data.summary.averageMargin >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                    {data.summary.averageMargin.toFixed(2)}%
+                  <p className={`text-2xl font-bold ${currentData.summary.averageMargin >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    {currentData.summary.averageMargin.toFixed(2)}%
                   </p>
                 </div>
                 <div className="text-3xl">📊</div>
@@ -400,15 +490,15 @@ export default function ProfitsReport() {
             <h3 className="text-lg font-semibold text-gray-800 mb-4">📊 Profit Overview</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div className="text-center p-4 bg-green-50 rounded-lg">
-                <div className="text-2xl font-bold text-green-600">{data.summary.profitableItems}</div>
+                <div className="text-2xl font-bold text-green-600">{currentData.summary.profitableItems}</div>
                 <div className="text-sm text-green-700">Profitable Items</div>
               </div>
               <div className="text-center p-4 bg-red-50 rounded-lg">
-                <div className="text-2xl font-bold text-red-600">{data.summary.lossItems}</div>
+                <div className="text-2xl font-bold text-red-600">{currentData.summary.lossItems}</div>
                 <div className="text-sm text-red-700">Loss Items</div>
               </div>
               <div className="text-center p-4 bg-blue-50 rounded-lg">
-                <div className="text-2xl font-bold text-blue-600">{data.summary.totalItems}</div>
+                <div className="text-2xl font-bold text-blue-600">{currentData.summary.totalItems}</div>
                 <div className="text-sm text-blue-700">Total Items</div>
               </div>
             </div>
@@ -419,14 +509,14 @@ export default function ProfitsReport() {
             <div className="p-6 border-b">
               <h3 className="text-lg font-semibold text-gray-800">📋 Orders with Profit Analysis</h3>
               <p className="text-sm text-gray-600 mt-1">
-                Showing {data.orders.length} orders with profit breakdown
+                Showing {currentData.orders.length} orders with profit breakdown
               </p>
             </div>
             
             <div className="overflow-x-auto">
-              {data.orders.length > 0 ? (
+              {currentData.orders.length > 0 ? (
                 <div className="divide-y divide-gray-200">
-                  {data.orders.map((order) => {
+                  {currentData.orders.map((order) => {
                     const isExpanded = expandedOrders.has(order.id);
                     const profitStatus = getProfitStatus(order.orderSummary.totalProfit);
                     const marginTier = getProfitMarginTier(order.orderSummary.averageMargin);
@@ -442,7 +532,16 @@ export default function ProfitsReport() {
                               {isExpanded ? '📂' : '📁'}
                             </div>
                             <div>
-                              <div className="font-medium text-gray-900">{order.orderNumber}</div>
+                              <div className="flex items-center gap-2">
+                                <div className="font-medium text-gray-900">{order.orderNumber}</div>
+                                <span className={`px-2 py-1 text-xs rounded-full ${
+                                  order.orderType === 'pickup' 
+                                    ? 'bg-purple-100 text-purple-700' 
+                                    : 'bg-blue-100 text-blue-700'
+                                }`}>
+                                  {order.orderType === 'pickup' ? '🏪 Pickup' : '🚚 Delivery'}
+                                </span>
+                              </div>
                               <div className="text-sm text-gray-500">
                                 {formatDateTime(order.createdAt)} • {order.email}
                               </div>
@@ -524,7 +623,8 @@ export default function ProfitsReport() {
             </div>
           </div>
         </>
-      )}
+        );
+      })()}
     </div>
   );
 } 

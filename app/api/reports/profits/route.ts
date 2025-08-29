@@ -10,6 +10,7 @@ export async function GET(req: NextRequest) {
     const startDate = searchParams.get('startDate');
     const endDate = searchParams.get('endDate');
     const productId = searchParams.get('productId');
+    const orderType = searchParams.get('orderType'); // pickup, delivery, or null for all
     const export_format = searchParams.get('export');
     
     // Build date filters
@@ -29,8 +30,14 @@ export async function GET(req: NextRequest) {
       productFilters.push(eq(orderItems.productId, productId));
     }
 
+    // Build order type filter
+    const orderTypeFilters = [];
+    if (orderType) {
+      orderTypeFilters.push(eq(orders.orderType, orderType));
+    }
+
     // Combine all filters
-    const whereConditions = [...dateFilters, ...productFilters];
+    const whereConditions = [...dateFilters, ...productFilters, ...orderTypeFilters];
 
     // Fetch orders with items that have cost prices
     const ordersWithItems = await db
@@ -128,7 +135,8 @@ export async function GET(req: NextRequest) {
         endDate
       },
       filters: {
-        productId
+        productId,
+        orderType
       }
     });
 

@@ -120,6 +120,7 @@ export default function EditProduct() {
   const [availableAttributes, setAvailableAttributes] = useState<DatabaseVariationAttribute[]>([]);
   const [selectedAttributes, setSelectedAttributes] = useState<VariationAttribute[]>([]);
   const [variantsToDelete, setVariantsToDelete] = useState<string[]>([]);
+  const [variantChanges, setVariantChanges] = useState<Record<string, Record<string, any>>>({});
   
   // Group product specific states
   const [availableAddons, setAvailableAddons] = useState<Addon[]>([]);
@@ -137,6 +138,7 @@ export default function EditProduct() {
   const [isSlugManuallyEdited, setIsSlugManuallyEdited] = useState(false);
   const [uploadingGallery, setUploadingGallery] = useState(false);
   const [uploadingBanner, setUploadingBanner] = useState(false);
+  const [explicitSubmit, setExplicitSubmit] = useState(false);
 
   useEffect(() => {
     fetchProductAndInitialData();
@@ -457,20 +459,17 @@ export default function EditProduct() {
   };
 
   // Variant management functions using our optimized hook
-  const handleVariantUpdate = async (variantId: string, field: string, value: any) => {
-    try {
-      const response = await fetch(`/api/product-variants/${variantId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ [field]: value })
-      });
-      
-      if (response.ok) {
-        await refetchVariants(); // Refresh variant data
+  const handleVariantUpdate = (variantId: string, field: string, value: any) => {
+    // Store variant changes locally instead of making immediate API calls
+    setVariantChanges(prev => ({
+      ...prev,
+      [variantId]: {
+        ...prev[variantId],
+        [field]: value
       }
-    } catch (error) {
-      console.error('Error updating variant:', error);
-    }
+    }));
+    
+    console.log(`Variant ${variantId} field '${field}' changed to:`, value, '(stored locally, will be saved on form submit)');
   };
 
   const handleVariantDelete = (variantId: string) => {
@@ -508,9 +507,49 @@ export default function EditProduct() {
     setSelectedAddons(selectedAddons.filter(addon => addon.addonId !== addonId));
   };
 
+  // Merge original variant data with pending changes for display
+  const getVariantsWithChanges = () => {
+    if (!variantData?.variants) return [];
+    
+    return variantData.variants.map(variant => {
+      const changes = variantChanges[variant.id];
+      if (changes) {
+        return { ...variant, ...changes };
+      }
+      return variant;
+    });
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    // Prevent form submission on Enter key press in input fields
+    if (e.key === 'Enter') {
+      const target = e.target as HTMLElement;
+      const tagName = target.tagName.toLowerCase();
+      
+      // Allow Enter in textarea fields but prevent in input fields
+      if (tagName === 'input' || tagName === 'select') {
+        e.preventDefault();
+        return false;
+      }
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Only allow submission if it was explicitly triggered by the submit button
+    if (!explicitSubmit) {
+      console.log('Form submission prevented - not explicitly triggered');
+      return;
+    }
+    
+    // Additional check to prevent accidental submissions
+    if (submitting) {
+      return;
+    }
+    
     setSubmitting(true);
+    setExplicitSubmit(false); // Reset the flag
     setError('');
 
     // Validate group products with zero price must have addons
@@ -538,6 +577,7 @@ export default function EditProduct() {
         selectedTags: selectedTags.length > 0 ? selectedTags : null,
         variationAttributes: formData.productType === 'variable' ? selectedAttributes : null,
         variantsToDelete: variantsToDelete.length > 0 ? variantsToDelete : null,
+        variantChanges: Object.keys(variantChanges).length > 0 ? variantChanges : null,
         addons: selectedAddons.length > 0 ? selectedAddons : null,
       };
 
@@ -554,6 +594,9 @@ export default function EditProduct() {
         throw new Error(data.error || 'Failed to update product');
       }
 
+      // Clear local changes after successful submission
+      setVariantChanges({});
+      
       router.push('/products');
     } catch (err: any) {
       setError(err.message);
@@ -598,7 +641,7 @@ export default function EditProduct() {
         </div>
       )}
       
-      <form onSubmit={handleSubmit} className="max-w-6xl">
+      <form onSubmit={handleSubmit} onKeyDown={handleKeyDown} className="max-w-6xl">
         {/* Product Type Selection */}
         <div className="mb-6 p-4 border rounded-lg bg-gray-50 hidden">
           <h3 className="text-lg font-semibold mb-4">Product Type</h3>
@@ -1317,13 +1360,25 @@ export default function EditProduct() {
         {/* Variable Product Variants - Using our optimized VariantManager */}
         {formData.productType === 'variable' && variantData && (
           <div className="mt-6">
-            <h3 className="text-lg font-semibold mb-4">🔧 Product Variants</h3>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold">🔧 Product Variants</h3>
+              {Object.keys(variantChanges).length > 0 && (
+                <div className="flex items-center gap-2 px-3 py-1 bg-yellow-100 border border-yellow-300 rounded-lg">
+                  <svg className="w-4 h-4 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                  </svg>
+                  <span className="text-sm text-yellow-800 font-medium">
+                    {Object.keys(variantChanges).length} variant{Object.keys(variantChanges).length > 1 ? 's' : ''} modified
+                  </span>
+                </div>
+              )}
+            </div>
             <p className="text-gray-600 mb-4">
-              Manage individual variant pricing, and settings. Variants are automatically organized by their attributes.
+              Manage individual variant pricing and settings. Changes are saved when you submit the form.
             </p>
             
             <VariantManager
-              variants={variantData.variants}
+              variants={getVariantsWithChanges()}
               onVariantUpdate={handleVariantUpdate}
               onVariantDelete={handleVariantDelete}
               isEditing={true}
@@ -1617,6 +1672,7 @@ export default function EditProduct() {
         <div className="flex gap-4 mt-8">
           <button
             type="submit"
+            onClick={() => setExplicitSubmit(true)}
             className="px-6 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50"
             disabled={submitting}
           >

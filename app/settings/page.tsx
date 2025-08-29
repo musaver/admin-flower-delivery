@@ -57,23 +57,31 @@ export default function SettingsPage() {
   });
   const [logoUploading, setLogoUploading] = useState(false);
 
+  // Store settings
+  const [storeSettings, setStoreSettings] = useState({
+    store_name: '',
+    store_description: ''
+  });
+
   useEffect(() => {
     fetchSettings();
   }, []);
 
   const fetchSettings = async () => {
     try {
-      const [stockRes, taxRes, loyaltyRes, appearanceRes] = await Promise.all([
+      const [stockRes, taxRes, loyaltyRes, appearanceRes, storeRes] = await Promise.all([
         fetch('/api/settings/stock-management'),
         fetch('/api/settings/tax-settings'),
         fetch('/api/settings/loyalty'),
-        fetch('/api/settings/appearance')
+        fetch('/api/settings/appearance'),
+        fetch('/api/settings/store')
       ]);
       
       const stockData = await stockRes.json();
       const taxData = await taxRes.json();
       const loyaltyData = await loyaltyRes.json();
       const appearanceData = await appearanceRes.json();
+      const storeData = await storeRes.json();
       
       setStockManagementEnabled(stockData.stockManagementEnabled);
       setVatTax(taxData.vatTax);
@@ -85,6 +93,10 @@ export default function SettingsPage() {
 
       if (appearanceData.success) {
         setAppearanceSettings(appearanceData.settings);
+      }
+
+      if (storeData.success) {
+        setStoreSettings(storeData.settings);
       }
     } catch (err) {
       console.error(err);
@@ -355,6 +367,43 @@ export default function SettingsPage() {
     }
   };
 
+  const handleStoreSettingChange = (field: 'store_name' | 'store_description', value: string) => {
+    setStoreSettings(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
+  const handleSaveStoreSettings = async () => {
+    try {
+      setSaving(true);
+      setError('');
+
+      // Validate settings
+      if (!storeSettings.store_name.trim()) {
+        throw new Error('Store name is required');
+      }
+
+      const response = await fetch('/api/settings/store', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ settings: storeSettings })
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to update store settings');
+      }
+
+      setSuccess('Store settings updated successfully');
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const getColorFromImage = (imageElement: HTMLImageElement, x: number, y: number): string => {
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
@@ -441,6 +490,68 @@ export default function SettingsPage() {
       )}
 
       <div className="space-y-8">
+        {/* Store Settings Section */}
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+          <div className="mb-6">
+            <h2 className="text-xl font-semibold text-gray-800">Store Information</h2>
+            <p className="text-gray-600 text-sm mt-1">
+              Configure your store's basic information and details
+            </p>
+          </div>
+
+          <div className="space-y-6">
+            {/* Store Name */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Store Name <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                value={storeSettings.store_name}
+                onChange={(e) => handleStoreSettingChange('store_name', e.target.value)}
+                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                placeholder="Enter your store name"
+                maxLength={255}
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                This will be displayed as your store's official name
+              </p>
+            </div>
+
+            {/* Store Description */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Store Description
+              </label>
+              <textarea
+                value={storeSettings.store_description}
+                onChange={(e) => handleStoreSettingChange('store_description', e.target.value)}
+                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors resize-vertical"
+                placeholder="Describe your store, products, or services..."
+                rows={2}
+                maxLength={1000}
+              />
+              <div className="flex justify-between items-center mt-1">
+                <span className="text-xs text-gray-400">
+                  {storeSettings.store_description.length}/1000
+                </span>
+              </div>
+            </div>
+
+
+            {/* Save Button */}
+            <div className="flex justify-end pt-4">
+              <button
+                onClick={handleSaveStoreSettings}
+                disabled={saving || !storeSettings.store_name.trim()}
+                className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {saving ? 'Saving...' : 'Save Store Settings'}
+              </button>
+            </div>
+          </div>
+        </div>
+
         {/* Appearance Settings Section */}
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
           <div className="mb-6">

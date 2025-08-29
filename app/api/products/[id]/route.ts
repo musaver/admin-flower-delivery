@@ -36,6 +36,7 @@ export async function PUT(
       variants, 
       variationAttributes, 
       variantsToDelete,
+      variantChanges,
       addons,
       selectedTags,
       ...productData 
@@ -117,6 +118,27 @@ export async function PUT(
       await db
         .delete(productVariants)
         .where(eq(productVariants.productId, id));
+    }
+
+    // Handle individual variant changes (from edit form)
+    if (variantChanges && Object.keys(variantChanges).length > 0) {
+      for (const [variantId, changes] of Object.entries(variantChanges)) {
+        const updateData: any = {};
+        
+        // Convert numeric fields to strings for decimal storage
+        Object.entries(changes as Record<string, any>).forEach(([field, value]) => {
+          if (['price', 'comparePrice', 'costPrice', 'weight'].includes(field)) {
+            updateData[field] = value ? value.toString() : null;
+          } else {
+            updateData[field] = value;
+          }
+        });
+
+        await db
+          .update(productVariants)
+          .set(updateData)
+          .where(eq(productVariants.id, variantId));
+      }
     }
 
     // Handle addon management for all product types
